@@ -33,7 +33,7 @@ function defineTabTool(tool) {
       const modalStates = tab.modalStates().map((state) => state.type);
       if (tool.clearsModalState && !modalStates.includes(tool.clearsModalState))
         response.addError(`Error: The tool "${tool.schema.name}" can only be used when there is related modal state present.`);
-      else if (!tool.clearsModalState && modalStates.length)
+      else if (!tool.clearsModalState && modalStates.length && tool.schema.type !== "readOnly")
         response.addError(`Error: Tool "${tool.schema.name}" does not handle the modal state.`);
       else
         return tool.handle(tab, params, response);
