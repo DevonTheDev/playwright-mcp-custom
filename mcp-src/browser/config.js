@@ -201,6 +201,7 @@ function configFromCLIOptions(cliOptions) {
       initPage: cliOptions.initPage,
       initScript: cliOptions.initScript
     },
+    browserMode: cliOptions.browserMode,
     extension: cliOptions.extension,
     server: {
       port: cliOptions.port,

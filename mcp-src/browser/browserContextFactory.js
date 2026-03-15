@@ -43,6 +43,7 @@ var import_server = require("playwright-core/lib/server");
 var import_log = require("../log");
 var import_config = require("./config");
 var import_server2 = require("../sdk/server");
+var import_detectBrowser = require("./detectBrowser");
 function contextFactory(config) {
   if (config.sharedBrowserContext)
     return SharedContextFactory.create(config);
@@ -50,6 +51,10 @@ function contextFactory(config) {
     return new RemoteContextFactory(config);
   if (config.browser.cdpEndpoint)
     return new CdpContextFactory(config);
+  if (config.browserMode === "existing")
+    return new AutoDetectCdpContextFactory(config);
+  if (config.browserMode === "auto")
+    return new AutoFallbackContextFactory(config);
   if (config.browser.isolated)
     return new IsolatedContextFactory(config);
   return new PersistentContextFactory(config);
@@ -264,6 +269,49 @@ function createHash(data) {
 async function addInitScript(browserContext, initScript) {
   for (const scriptPath of initScript ?? [])
     await browserContext.addInitScript({ path: import_path.default.resolve(scriptPath) });
+}
+class AutoDetectCdpContextFactory extends BaseContextFactory {
+  constructor(config) {
+    super("auto-detect-cdp", config);
+  }
+  async _doObtainBrowser() {
+    const detected = await (0, import_detectBrowser.detectExistingBrowser)();
+    if (!detected)
+      throw new Error("No existing browser with remote debugging found. Start Chrome with --remote-debugging-port=9222");
+    (0, import_log.testDebug)(`detected existing browser: ${detected.browser} on port ${detected.port}`);
+    console.error(`Connecting to existing browser: ${detected.browser} on port ${detected.port}`);
+    return playwright.chromium.connectOverCDP(detected.webSocketDebuggerUrl, {
+      timeout: this.config.browser.cdpTimeout
+    });
+  }
+  async _doCreateContext(browser) {
+    return this.config.browser.isolated ? await browser.newContext() : browser.contexts()[0];
+  }
+}
+class AutoFallbackContextFactory {
+  constructor(config) {
+    this.name = "auto-fallback";
+    this.description = "Try existing browser, fall back to persistent";
+    this.config = config;
+    this._autoDetect = new AutoDetectCdpContextFactory(config);
+    this._persistent = new PersistentContextFactory(config);
+  }
+  async createContext(clientInfo, abortSignal, options) {
+    const detected = await (0, import_detectBrowser.detectExistingBrowser)();
+    if (detected) {
+      (0, import_log.testDebug)(`auto mode: found existing browser on port ${detected.port}, connecting`);
+      console.error(`Auto mode: connecting to existing browser (${detected.browser}) on port ${detected.port}`);
+      try {
+        return await this._autoDetect.createContext(clientInfo, abortSignal, options);
+      } catch (e) {
+        (0, import_log.testDebug)("auto mode: failed to connect to existing browser, falling back to persistent");
+        console.error("Auto mode: failed to connect to existing browser, launching new one");
+      }
+    } else {
+      (0, import_log.testDebug)("auto mode: no existing browser found, launching new one");
+    }
+    return this._persistent.createContext(clientInfo, abortSignal, options);
+  }
 }
 class SharedContextFactory {
   static create(config) {
