@@ -153,7 +153,7 @@ Write-Output '${safePath}'
 `;
     }
 
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Screenshot failed: ${result.error}`);
 
     const data = fs.readFileSync(tempFile);
@@ -204,7 +204,7 @@ Start-Sleep -Milliseconds 50
 ${clickCode}
 Write-Output "Clicked at (${params.x}, ${params.y})"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Click failed: ${result.error}`);
     response.addTextResult(`${params.doubleClick ? "Double-clicked" : "Clicked"} ${params.button} button at (${params.x}, ${params.y})`);
   }
@@ -230,7 +230,7 @@ const desktopType = (0, import_tool.defineTool)({
 [System.Windows.Forms.SendKeys]::SendWait('${escaped.replace(/'/g, "''")}')
 Write-Output "Typed text"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Type failed: ${result.error}`);
     response.addTextResult(`Typed ${params.text.length} characters`);
   }
@@ -256,7 +256,7 @@ const desktopKey = (0, import_tool.defineTool)({
 [System.Windows.Forms.SendKeys]::SendWait('${sendKeysStr.replace(/'/g, "''")}')
 Write-Output "Pressed ${params.key}"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Key press failed: ${result.error}`);
     response.addTextResult(`Pressed: ${params.key}`);
   }
@@ -282,7 +282,7 @@ const desktopMouseMove = (0, import_tool.defineTool)({
 [Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null
 Write-Output "Moved to (${params.x}, ${params.y})"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Mouse move failed: ${result.error}`);
     response.addTextResult(`Mouse moved to (${params.x}, ${params.y})`);
   }
@@ -315,7 +315,7 @@ ${moveCmd}
 [Win32Input]::mouse_event([Win32Input]::WHEEL, 0, 0, ${amountExpr}, [IntPtr]::Zero)
 Write-Output "Scrolled ${params.direction} ${params.clicks} clicks"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Scroll failed: ${result.error}`);
     response.addTextResult(`Scrolled ${params.direction} ${params.clicks} clicks`);
   }
@@ -343,7 +343,7 @@ Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | ForEach-Object {
     }
 } | ConvertTo-Json -Depth 2
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`List windows failed: ${result.error}`);
 
     let windows;
@@ -410,7 +410,7 @@ Start-Sleep -Milliseconds 100
 [Win32Input]::SetForegroundWindow($hwnd) | Out-Null
 Write-Output "$($proc.ProcessName) - $($proc.MainWindowTitle)"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Focus window failed: ${result.error}`);
     response.addTextResult(`Window ${params.action}: ${result.output}`);
   }
@@ -440,7 +440,7 @@ $proc = Start-Process -FilePath '${escapedCmd}'${argsStr} -PassThru
 ${waitStr}
 Write-Output "Launched PID: $($proc.Id)"
 `;
-    const result = runPowerShell(script, 20000);
+    const result = await runPowerShell(script, 20000);
     if (!result.success) throw new Error(`Launch failed: ${result.error}`);
     response.addTextResult(`Launched: ${params.command} (${result.output})`);
   }
@@ -464,7 +464,7 @@ $point = New-Object Win32Input+POINT
 [Win32Input]::GetCursorPos([ref]$point) | Out-Null
 Write-Output "$($point.X),$($point.Y)"
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Get cursor position failed: ${result.error}`);
     const [x, y] = result.output.split(",");
     response.addTextResult(`Cursor position: (${x}, ${y})`);
@@ -494,7 +494,7 @@ for ($i = 0; $i -lt $screens.Length; $i++) {
   Write-Output ("$num" + $p + ": " + $s.Bounds.Width + "x" + $s.Bounds.Height + " at (" + $s.Bounds.X + "," + $s.Bounds.Y + ") " + $s.DeviceName)
 }
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`List monitors failed: ${result.error}`);
     response.addTextResult(`## Monitors\n${result.output}`);
   }

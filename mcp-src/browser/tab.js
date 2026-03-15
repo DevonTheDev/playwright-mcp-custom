@@ -76,18 +76,28 @@ class Tab extends import_events.EventEmitter {
   }
   static async collectConsoleMessages(page) {
     const result = [];
-    const messages = await page.consoleMessages().catch(() => []);
-    for (const message of messages)
-      result.push(messageToConsoleMessage(message));
-    const errors = await page.pageErrors().catch(() => []);
-    for (const error of errors)
-      result.push(pageErrorToConsoleMessage(error));
+    try {
+      if (typeof page.consoleMessages === "function") {
+        const messages = await page.consoleMessages().catch(() => []);
+        for (const message of messages)
+          result.push(messageToConsoleMessage(message));
+      }
+      if (typeof page.pageErrors === "function") {
+        const errors = await page.pageErrors().catch(() => []);
+        for (const error of errors)
+          result.push(pageErrorToConsoleMessage(error));
+      }
+    } catch (e) {
+      // Swallow errors from console/error collection to prevent crashes
+    }
     return result;
   }
   async _initialize() {
-    for (const message of await Tab.collectConsoleMessages(this.page))
-      this._handleConsoleMessage(message);
-    const requests = await this.page.requests().catch(() => []);
+    try {
+      for (const message of await Tab.collectConsoleMessages(this.page))
+        this._handleConsoleMessage(message);
+    } catch (e) {}
+    const requests = await (typeof this.page.requests === "function" ? this.page.requests().catch(() => []) : Promise.resolve([]));
     for (const request of requests.filter((r) => r.existingResponse() || r.failure()))
       this._requests.push(request);
     for (const initPage of this.context.config.browser.initPage || []) {

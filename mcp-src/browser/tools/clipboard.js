@@ -43,7 +43,7 @@ const clipboardRead = (0, import_tool.defineTool)({
     type: "readOnly"
   },
   handle: async (context, params, response) => {
-    const result = runPowerShell("Get-Clipboard -Raw");
+    const result = await runPowerShell("Get-Clipboard -Raw");
     if (!result.success) throw new Error(`Clipboard read failed: ${result.error}`);
     if (!result.output) {
       response.addTextResult("Clipboard is empty (no text content).");
@@ -72,7 +72,7 @@ const clipboardWrite = (0, import_tool.defineTool)({
     fs.writeFileSync(tempFile, params.text, "utf-8");
     try {
       const script = `Get-Content -Path '${tempFile.replace(/'/g, "''")}' -Raw | Set-Clipboard`;
-      const result = runPowerShell(script);
+      const result = await runPowerShell(script);
       if (!result.success) throw new Error(`Clipboard write failed: ${result.error}`);
       response.addTextResult(`Wrote ${params.text.length} characters to clipboard.`);
     } finally {
@@ -107,7 +107,7 @@ if ($img -eq $null) {
     Write-Output '${tempFile.replace(/\\/g, "\\\\")}'
 }
 `;
-    const result = runPowerShell(script);
+    const result = await runPowerShell(script);
     if (!result.success) throw new Error(`Clipboard image read failed: ${result.error}`);
 
     if (result.output === "NO_IMAGE") {
