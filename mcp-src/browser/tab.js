@@ -219,8 +219,8 @@ class Tab extends import_events.EventEmitter {
   }
   async consoleMessageCount() {
     await this._initializedPromise;
-    const messages = await this.page.consoleMessages();
-    const pageErrors = await this.page.pageErrors();
+    const messages = await (this.page.consoleMessages?.() ?? Promise.resolve([]));
+    const pageErrors = await (this.page.pageErrors?.() ?? Promise.resolve([]));
     let errors = pageErrors.length;
     let warnings = 0;
     for (const message of messages) {
@@ -234,14 +234,14 @@ class Tab extends import_events.EventEmitter {
   async consoleMessages(level) {
     await this._initializedPromise;
     const result = [];
-    const messages = await this.page.consoleMessages();
+    const messages = await (this.page.consoleMessages?.() ?? Promise.resolve([]));
     for (const message of messages) {
       const cm = messageToConsoleMessage(message);
       if (shouldIncludeMessage(level, cm.type))
         result.push(cm);
     }
     if (shouldIncludeMessage(level, "error")) {
-      const errors = await this.page.pageErrors();
+      const errors = await (this.page.pageErrors?.() ?? Promise.resolve([]));
       for (const error of errors)
         result.push(pageErrorToConsoleMessage(error));
     }
@@ -250,8 +250,8 @@ class Tab extends import_events.EventEmitter {
   async clearConsoleMessages() {
     await this._initializedPromise;
     await Promise.all([
-      this.page.clearConsoleMessages(),
-      this.page.clearPageErrors()
+      this.page.clearConsoleMessages?.() ?? Promise.resolve(),
+      this.page.clearPageErrors?.() ?? Promise.resolve()
     ]);
   }
   async requests() {
