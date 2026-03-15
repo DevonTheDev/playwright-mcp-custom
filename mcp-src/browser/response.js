@@ -184,7 +184,7 @@ class Response {
         } else if (event.type === "download-start") {
           text.push(`- Downloading file ${event.download.download.suggestedFilename()} ...`);
         } else if (event.type === "download-finish") {
-          text.push(`- Downloaded file ${event.download.download.suggestedFilename()} to "${this._computRelativeTo(event.download.outputFile)}"`);
+          text.push(`- Downloaded file ${event.download.download.suggestedFilename()} to "${import_path.default.resolve(event.download.outputFile)}"`);
         }
       }
     }
