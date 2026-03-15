@@ -45,6 +45,7 @@ class Context {
     this._tabs = [];
     this._routes = [];
     this._abortController = new AbortController();
+    this._closeGraceTimer = null;
     this.config = options.config;
     this.sessionLog = options.sessionLog;
     this.options = options;
@@ -133,6 +134,11 @@ class Context {
     return video.allVideos;
   }
   _onPageCreated(page) {
+    if (this._closeGraceTimer) {
+      clearTimeout(this._closeGraceTimer);
+      this._closeGraceTimer = null;
+      testDebug("grace period cancelled - new tab opened");
+    }
     const tab = new import_tab.Tab(this, page, (tab2) => this._onPageClosed(tab2));
     this._tabs.push(tab);
     if (!this._currentTab)
@@ -145,8 +151,16 @@ class Context {
     this._tabs.splice(index, 1);
     if (this._currentTab === tab)
       this._currentTab = this._tabs[Math.min(index, this._tabs.length - 1)];
-    if (!this._tabs.length)
-      void this.closeBrowserContext();
+    if (!this._tabs.length) {
+      testDebug("last tab closed, starting 30s grace period before closing context");
+      this._closeGraceTimer = setTimeout(() => {
+        this._closeGraceTimer = null;
+        if (!this._tabs.length) {
+          testDebug("grace period expired, closing browser context");
+          void this.closeBrowserContext();
+        }
+      }, 30e3);
+    }
   }
   async closeBrowserContext() {
     if (!this._closeBrowserContextPromise)
@@ -200,6 +214,10 @@ class Context {
     });
   }
   async dispose() {
+    if (this._closeGraceTimer) {
+      clearTimeout(this._closeGraceTimer);
+      this._closeGraceTimer = null;
+    }
     this._abortController.abort("MCP context disposed");
     await this.closeBrowserContext();
     Context._allContexts.delete(this);
