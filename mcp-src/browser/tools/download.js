@@ -30,10 +30,10 @@ const browserDownloadFile = (0, import_tool.defineTabTool)({
   schema: {
     name: "browser_download_file",
     title: "Download file",
-    description: "Download a file from a URL to disk using the browser's network context (cookies/auth are preserved).",
+    description: "Download a URL to disk (preserves cookies/auth).",
     inputSchema: import_mcpBundle.z.object({
-      url: import_mcpBundle.z.string().describe("URL of the file to download."),
-      filename: import_mcpBundle.z.string().optional().describe("Filename to save as. If omitted, derived from URL.")
+      url: import_mcpBundle.z.string().describe("URL"),
+      filename: import_mcpBundle.z.string().optional().describe("Filename")
     }),
     type: "action"
   },

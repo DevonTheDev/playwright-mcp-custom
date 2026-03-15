@@ -78,6 +78,7 @@ const defaultConfig = {
     blockedOrigins: void 0
   },
   server: {},
+  codegen: "none",
   saveTrace: false,
   snapshot: {
     mode: "incremental",

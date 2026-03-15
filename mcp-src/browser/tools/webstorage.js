@@ -23,201 +23,122 @@ __export(webstorage_exports, {
 module.exports = __toCommonJS(webstorage_exports);
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
-const localStorageList = (0, import_tool.defineTabTool)({
+
+const storageTypeParam = import_mcpBundle.z.enum(["local", "session"]).default("local").describe("local or session");
+
+function getStorage(type) {
+  return type === "session" ? "sessionStorage" : "localStorage";
+}
+
+const webstorageList = (0, import_tool.defineTabTool)({
   capability: "storage",
   schema: {
-    name: "browser_localstorage_list",
-    title: "List localStorage",
-    description: "List all localStorage key-value pairs",
-    inputSchema: import_mcpBundle.z.object({}),
+    name: "browser_webstorage_list",
+    title: "List web storage",
+    description: "List all key-value pairs in localStorage or sessionStorage.",
+    inputSchema: import_mcpBundle.z.object({ storageType: storageTypeParam }),
     type: "readOnly"
   },
   handle: async (tab, params, response) => {
-    const items = await tab.page.evaluate(() => {
+    const s = getStorage(params.storageType);
+    const items = await tab.page.evaluate((storage) => {
+      const st = storage === "sessionStorage" ? sessionStorage : localStorage;
       const result = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key !== null)
-          result.push({ key, value: localStorage.getItem(key) || "" });
+      for (let i = 0; i < st.length; i++) {
+        const key = st.key(i);
+        if (key !== null) result.push({ key, value: st.getItem(key) || "" });
       }
       return result;
-    });
-    if (items.length === 0)
-      response.addTextResult("No localStorage items found");
-    else
-      response.addTextResult(items.map((item) => `${item.key}=${item.value}`).join("\n"));
-    response.addCode(`await page.evaluate(() => ({ ...localStorage }));`);
+    }, s);
+    if (items.length === 0) response.addTextResult(`No ${s} items`);
+    else response.addTextResult(items.map((item) => `${item.key}=${item.value}`).join("\n"));
   }
 });
-const localStorageGet = (0, import_tool.defineTabTool)({
+
+const webstorageGet = (0, import_tool.defineTabTool)({
   capability: "storage",
   schema: {
-    name: "browser_localstorage_get",
-    title: "Get localStorage item",
-    description: "Get a localStorage item by key",
+    name: "browser_webstorage_get",
+    title: "Get web storage item",
+    description: "Get a value by key from localStorage or sessionStorage.",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to get")
+      key: import_mcpBundle.z.string().describe("Key"),
+      storageType: storageTypeParam
     }),
     type: "readOnly"
   },
   handle: async (tab, params, response) => {
-    const value = await tab.page.evaluate((key) => localStorage.getItem(key), params.key);
-    if (value === null)
-      response.addTextResult(`localStorage key '${params.key}' not found`);
-    else
-      response.addTextResult(`${params.key}=${value}`);
-    response.addCode(`await page.evaluate(() => localStorage.getItem('${params.key}'));`);
+    const s = getStorage(params.storageType);
+    const value = await tab.page.evaluate(({ storage, key }) => {
+      return (storage === "sessionStorage" ? sessionStorage : localStorage).getItem(key);
+    }, { storage: s, key: params.key });
+    if (value === null) response.addTextResult(`Key '${params.key}' not found`);
+    else response.addTextResult(`${params.key}=${value}`);
   }
 });
-const localStorageSet = (0, import_tool.defineTabTool)({
+
+const webstorageSet = (0, import_tool.defineTabTool)({
   capability: "storage",
   schema: {
-    name: "browser_localstorage_set",
-    title: "Set localStorage item",
-    description: "Set a localStorage item",
+    name: "browser_webstorage_set",
+    title: "Set web storage item",
+    description: "Set a key-value pair in localStorage or sessionStorage.",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to set"),
-      value: import_mcpBundle.z.string().describe("Value to set")
+      key: import_mcpBundle.z.string().describe("Key"),
+      value: import_mcpBundle.z.string().describe("Value"),
+      storageType: storageTypeParam
     }),
     type: "action"
   },
   handle: async (tab, params, response) => {
-    await tab.page.evaluate(({ key, value }) => localStorage.setItem(key, value), params);
-    response.addCode(`await page.evaluate(() => localStorage.setItem('${params.key}', '${params.value}'));`);
+    const s = getStorage(params.storageType);
+    await tab.page.evaluate(({ storage, key, value }) => {
+      (storage === "sessionStorage" ? sessionStorage : localStorage).setItem(key, value);
+    }, { storage: s, key: params.key, value: params.value });
   }
 });
-const localStorageDelete = (0, import_tool.defineTabTool)({
+
+const webstorageDelete = (0, import_tool.defineTabTool)({
   capability: "storage",
   schema: {
-    name: "browser_localstorage_delete",
-    title: "Delete localStorage item",
-    description: "Delete a localStorage item",
+    name: "browser_webstorage_delete",
+    title: "Delete web storage item",
+    description: "Delete a key from localStorage or sessionStorage.",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to delete")
+      key: import_mcpBundle.z.string().describe("Key"),
+      storageType: storageTypeParam
     }),
     type: "action"
   },
   handle: async (tab, params, response) => {
-    await tab.page.evaluate((key) => localStorage.removeItem(key), params.key);
-    response.addCode(`await page.evaluate(() => localStorage.removeItem('${params.key}'));`);
+    const s = getStorage(params.storageType);
+    await tab.page.evaluate(({ storage, key }) => {
+      (storage === "sessionStorage" ? sessionStorage : localStorage).removeItem(key);
+    }, { storage: s, key: params.key });
   }
 });
-const localStorageClear = (0, import_tool.defineTabTool)({
+
+const webstorageClear = (0, import_tool.defineTabTool)({
   capability: "storage",
   schema: {
-    name: "browser_localstorage_clear",
-    title: "Clear localStorage",
-    description: "Clear all localStorage",
-    inputSchema: import_mcpBundle.z.object({}),
+    name: "browser_webstorage_clear",
+    title: "Clear web storage",
+    description: "Clear all localStorage or sessionStorage.",
+    inputSchema: import_mcpBundle.z.object({ storageType: storageTypeParam }),
     type: "action"
   },
   handle: async (tab, params, response) => {
-    await tab.page.evaluate(() => localStorage.clear());
-    response.addCode(`await page.evaluate(() => localStorage.clear());`);
+    const s = getStorage(params.storageType);
+    await tab.page.evaluate((storage) => {
+      (storage === "sessionStorage" ? sessionStorage : localStorage).clear();
+    }, s);
   }
 });
-const sessionStorageList = (0, import_tool.defineTabTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_sessionstorage_list",
-    title: "List sessionStorage",
-    description: "List all sessionStorage key-value pairs",
-    inputSchema: import_mcpBundle.z.object({}),
-    type: "readOnly"
-  },
-  handle: async (tab, params, response) => {
-    const items = await tab.page.evaluate(() => {
-      const result = [];
-      for (let i = 0; i < sessionStorage.length; i++) {
-        const key = sessionStorage.key(i);
-        if (key !== null)
-          result.push({ key, value: sessionStorage.getItem(key) || "" });
-      }
-      return result;
-    });
-    if (items.length === 0)
-      response.addTextResult("No sessionStorage items found");
-    else
-      response.addTextResult(items.map((item) => `${item.key}=${item.value}`).join("\n"));
-    response.addCode(`await page.evaluate(() => ({ ...sessionStorage }));`);
-  }
-});
-const sessionStorageGet = (0, import_tool.defineTabTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_sessionstorage_get",
-    title: "Get sessionStorage item",
-    description: "Get a sessionStorage item by key",
-    inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to get")
-    }),
-    type: "readOnly"
-  },
-  handle: async (tab, params, response) => {
-    const value = await tab.page.evaluate((key) => sessionStorage.getItem(key), params.key);
-    if (value === null)
-      response.addTextResult(`sessionStorage key '${params.key}' not found`);
-    else
-      response.addTextResult(`${params.key}=${value}`);
-    response.addCode(`await page.evaluate(() => sessionStorage.getItem('${params.key}'));`);
-  }
-});
-const sessionStorageSet = (0, import_tool.defineTabTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_sessionstorage_set",
-    title: "Set sessionStorage item",
-    description: "Set a sessionStorage item",
-    inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to set"),
-      value: import_mcpBundle.z.string().describe("Value to set")
-    }),
-    type: "action"
-  },
-  handle: async (tab, params, response) => {
-    await tab.page.evaluate(({ key, value }) => sessionStorage.setItem(key, value), params);
-    response.addCode(`await page.evaluate(() => sessionStorage.setItem('${params.key}', '${params.value}'));`);
-  }
-});
-const sessionStorageDelete = (0, import_tool.defineTabTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_sessionstorage_delete",
-    title: "Delete sessionStorage item",
-    description: "Delete a sessionStorage item",
-    inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to delete")
-    }),
-    type: "action"
-  },
-  handle: async (tab, params, response) => {
-    await tab.page.evaluate((key) => sessionStorage.removeItem(key), params.key);
-    response.addCode(`await page.evaluate(() => sessionStorage.removeItem('${params.key}'));`);
-  }
-});
-const sessionStorageClear = (0, import_tool.defineTabTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_sessionstorage_clear",
-    title: "Clear sessionStorage",
-    description: "Clear all sessionStorage",
-    inputSchema: import_mcpBundle.z.object({}),
-    type: "action"
-  },
-  handle: async (tab, params, response) => {
-    await tab.page.evaluate(() => sessionStorage.clear());
-    response.addCode(`await page.evaluate(() => sessionStorage.clear());`);
-  }
-});
+
 var webstorage_default = [
-  localStorageList,
-  localStorageGet,
-  localStorageSet,
-  localStorageDelete,
-  localStorageClear,
-  sessionStorageList,
-  sessionStorageGet,
-  sessionStorageSet,
-  sessionStorageDelete,
-  sessionStorageClear
+  webstorageList,
+  webstorageGet,
+  webstorageSet,
+  webstorageDelete,
+  webstorageClear
 ];

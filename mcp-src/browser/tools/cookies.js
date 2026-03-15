@@ -23,69 +23,44 @@ __export(cookies_exports, {
 module.exports = __toCommonJS(cookies_exports);
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
-const cookieList = (0, import_tool.defineTool)({
+
+const cookieGet = (0, import_tool.defineTool)({
   capability: "storage",
   schema: {
-    name: "browser_cookie_list",
-    title: "List cookies",
-    description: "List all cookies (optionally filtered by domain/path)",
+    name: "browser_cookie_get",
+    title: "Get cookies",
+    description: "List cookies, optionally filtered by name or domain.",
     inputSchema: import_mcpBundle.z.object({
-      domain: import_mcpBundle.z.string().optional().describe("Filter cookies by domain"),
-      path: import_mcpBundle.z.string().optional().describe("Filter cookies by path")
+      name: import_mcpBundle.z.string().optional().describe("Filter by cookie name"),
+      domain: import_mcpBundle.z.string().optional().describe("Filter by domain")
     }),
     type: "readOnly"
   },
   handle: async (context, params, response) => {
     const browserContext = await context.ensureBrowserContext();
     let cookies = await browserContext.cookies();
-    if (params.domain)
-      cookies = cookies.filter((c) => c.domain.includes(params.domain));
-    if (params.path)
-      cookies = cookies.filter((c) => c.path.startsWith(params.path));
-    if (cookies.length === 0)
-      response.addTextResult("No cookies found");
-    else
-      response.addTextResult(cookies.map((c) => `${c.name}=${c.value} (domain: ${c.domain}, path: ${c.path})`).join("\n"));
-    response.addCode(`await page.context().cookies();`);
+    if (params.name) cookies = cookies.filter((c) => c.name === params.name);
+    if (params.domain) cookies = cookies.filter((c) => c.domain.includes(params.domain));
+    if (cookies.length === 0) response.addTextResult("No cookies found");
+    else response.addTextResult(cookies.map((c) => `${c.name}=${c.value} (${c.domain}${c.path})`).join("\n"));
   }
 });
-const cookieGet = (0, import_tool.defineTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_cookie_get",
-    title: "Get cookie",
-    description: "Get a specific cookie by name",
-    inputSchema: import_mcpBundle.z.object({
-      name: import_mcpBundle.z.string().describe("Cookie name to get")
-    }),
-    type: "readOnly"
-  },
-  handle: async (context, params, response) => {
-    const browserContext = await context.ensureBrowserContext();
-    const cookies = await browserContext.cookies();
-    const cookie = cookies.find((c) => c.name === params.name);
-    if (!cookie)
-      response.addTextResult(`Cookie '${params.name}' not found`);
-    else
-      response.addTextResult(`${cookie.name}=${cookie.value} (domain: ${cookie.domain}, path: ${cookie.path}, httpOnly: ${cookie.httpOnly}, secure: ${cookie.secure}, sameSite: ${cookie.sameSite})`);
-    response.addCode(`await page.context().cookies();`);
-  }
-});
+
 const cookieSet = (0, import_tool.defineTool)({
   capability: "storage",
   schema: {
     name: "browser_cookie_set",
     title: "Set cookie",
-    description: "Set a cookie with optional flags (domain, path, expires, httpOnly, secure, sameSite)",
+    description: "Set a cookie.",
     inputSchema: import_mcpBundle.z.object({
-      name: import_mcpBundle.z.string().describe("Cookie name"),
-      value: import_mcpBundle.z.string().describe("Cookie value"),
-      domain: import_mcpBundle.z.string().optional().describe("Cookie domain"),
-      path: import_mcpBundle.z.string().optional().describe("Cookie path"),
-      expires: import_mcpBundle.z.number().optional().describe("Cookie expiration as Unix timestamp"),
-      httpOnly: import_mcpBundle.z.boolean().optional().describe("Whether the cookie is HTTP only"),
-      secure: import_mcpBundle.z.boolean().optional().describe("Whether the cookie is secure"),
-      sameSite: import_mcpBundle.z.enum(["Strict", "Lax", "None"]).optional().describe("Cookie SameSite attribute")
+      name: import_mcpBundle.z.string().describe("Name"),
+      value: import_mcpBundle.z.string().describe("Value"),
+      domain: import_mcpBundle.z.string().optional().describe("Domain"),
+      path: import_mcpBundle.z.string().optional().describe("Path"),
+      expires: import_mcpBundle.z.number().optional().describe("Unix timestamp"),
+      httpOnly: import_mcpBundle.z.boolean().optional(),
+      secure: import_mcpBundle.z.boolean().optional(),
+      sameSite: import_mcpBundle.z.enum(["Strict", "Lax", "None"]).optional()
     }),
     type: "action"
   },
@@ -99,54 +74,36 @@ const cookieSet = (0, import_tool.defineTool)({
       domain: params.domain || url.hostname,
       path: params.path || "/"
     };
-    if (params.expires !== void 0)
-      cookie.expires = params.expires;
-    if (params.httpOnly !== void 0)
-      cookie.httpOnly = params.httpOnly;
-    if (params.secure !== void 0)
-      cookie.secure = params.secure;
-    if (params.sameSite !== void 0)
-      cookie.sameSite = params.sameSite;
+    if (params.expires !== void 0) cookie.expires = params.expires;
+    if (params.httpOnly !== void 0) cookie.httpOnly = params.httpOnly;
+    if (params.secure !== void 0) cookie.secure = params.secure;
+    if (params.sameSite !== void 0) cookie.sameSite = params.sameSite;
     await browserContext.addCookies([cookie]);
-    response.addCode(`await page.context().addCookies([${JSON.stringify(cookie)}]);`);
   }
 });
-const cookieDelete = (0, import_tool.defineTool)({
-  capability: "storage",
-  schema: {
-    name: "browser_cookie_delete",
-    title: "Delete cookie",
-    description: "Delete a specific cookie",
-    inputSchema: import_mcpBundle.z.object({
-      name: import_mcpBundle.z.string().describe("Cookie name to delete")
-    }),
-    type: "action"
-  },
-  handle: async (context, params, response) => {
-    const browserContext = await context.ensureBrowserContext();
-    await browserContext.clearCookies({ name: params.name });
-    response.addCode(`await page.context().clearCookies({ name: '${params.name}' });`);
-  }
-});
+
 const cookieClear = (0, import_tool.defineTool)({
   capability: "storage",
   schema: {
     name: "browser_cookie_clear",
     title: "Clear cookies",
-    description: "Clear all cookies",
-    inputSchema: import_mcpBundle.z.object({}),
+    description: "Clear cookies. If name is given, clears that cookie only; otherwise clears all.",
+    inputSchema: import_mcpBundle.z.object({
+      name: import_mcpBundle.z.string().optional().describe("Cookie name to delete, or omit to clear all")
+    }),
     type: "action"
   },
   handle: async (context, params, response) => {
     const browserContext = await context.ensureBrowserContext();
-    await browserContext.clearCookies();
-    response.addCode(`await page.context().clearCookies();`);
+    if (params.name)
+      await browserContext.clearCookies({ name: params.name });
+    else
+      await browserContext.clearCookies();
   }
 });
+
 var cookies_default = [
-  cookieList,
   cookieGet,
   cookieSet,
-  cookieDelete,
   cookieClear
 ];

@@ -60,11 +60,11 @@ const stateSet = (0, import_tool.defineTool)({
   schema: {
     name: "state_set",
     title: "Set persistent state",
-    description: "Store a key-value pair in persistent storage that survives across MCP sessions. Values can be any JSON-serializable type.",
+    description: "Store a key-value pair (persists across sessions).",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to store under"),
-      value: import_mcpBundle.z.any().describe("Value to store (string, number, object, array, boolean)"),
-      namespace: import_mcpBundle.z.string().default("default").describe("Optional namespace to organize keys")
+      key: import_mcpBundle.z.string().describe("Key"),
+      value: import_mcpBundle.z.any().describe("Value (any JSON type)"),
+      namespace: import_mcpBundle.z.string().default("default").describe("Namespace")
     }),
     type: "action"
   },
@@ -87,10 +87,10 @@ const stateGet = (0, import_tool.defineTool)({
   schema: {
     name: "state_get",
     title: "Get persistent state",
-    description: "Retrieve a value from persistent storage by key.",
+    description: "Get a value by key from persistent storage.",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe("Key to look up"),
-      namespace: import_mcpBundle.z.string().default("default").describe("Namespace to look in")
+      key: import_mcpBundle.z.string().describe("Key"),
+      namespace: import_mcpBundle.z.string().default("default").describe("Namespace")
     }),
     type: "readOnly"
   },
@@ -114,9 +114,9 @@ const stateList = (0, import_tool.defineTool)({
   schema: {
     name: "state_list",
     title: "List persistent state",
-    description: "List all keys in persistent storage, optionally filtered by namespace.",
+    description: "List keys in persistent storage.",
     inputSchema: import_mcpBundle.z.object({
-      namespace: import_mcpBundle.z.string().optional().describe("Namespace to list. If omitted, lists all namespaces and their keys.")
+      namespace: import_mcpBundle.z.string().optional().describe("Namespace (omit for all)")
     }),
     type: "readOnly"
   },
@@ -168,10 +168,10 @@ const stateDelete = (0, import_tool.defineTool)({
   schema: {
     name: "state_delete",
     title: "Delete persistent state",
-    description: "Delete a key from persistent storage, or clear an entire namespace.",
+    description: "Delete a key or clear a namespace from persistent storage.",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().optional().describe("Key to delete. If omitted, deletes the entire namespace."),
-      namespace: import_mcpBundle.z.string().default("default").describe("Namespace to operate on")
+      key: import_mcpBundle.z.string().optional().describe("Key (omit to clear namespace)"),
+      namespace: import_mcpBundle.z.string().default("default").describe("Namespace")
     }),
     type: "action"
   },

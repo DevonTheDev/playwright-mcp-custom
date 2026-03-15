@@ -38,10 +38,10 @@ const wsMonitorStart = (0, import_tool.defineTabTool)({
   schema: {
     name: "browser_ws_start",
     title: "Start WebSocket monitor",
-    description: "Start monitoring WebSocket and SSE traffic on the current page. Captures all messages sent and received.",
+    description: "Start monitoring WebSocket/SSE traffic on current page.",
     inputSchema: import_mcpBundle.z.object({
-      maxMessages: import_mcpBundle.z.number().default(500).describe("Maximum messages to buffer per connection. Default 500."),
-      urlFilter: import_mcpBundle.z.string().optional().describe("Only monitor WebSocket URLs containing this string.")
+      maxMessages: import_mcpBundle.z.number().default(500).describe("Max messages to buffer"),
+      urlFilter: import_mcpBundle.z.string().optional().describe("URL filter (partial match)")
     }),
     type: "action"
   },
@@ -171,11 +171,11 @@ const wsGetMessages = (0, import_tool.defineTabTool)({
   schema: {
     name: "browser_ws_messages",
     title: "Get WebSocket messages",
-    description: "Get captured WebSocket and SSE messages from the monitor. Returns recent messages across all connections.",
+    description: "Get captured WebSocket/SSE messages.",
     inputSchema: import_mcpBundle.z.object({
-      limit: import_mcpBundle.z.number().default(50).describe("Maximum messages to return per connection. Default 50."),
-      connectionUrl: import_mcpBundle.z.string().optional().describe("Filter messages by connection URL (partial match)."),
-      clear: import_mcpBundle.z.boolean().default(false).describe("Clear message buffer after reading.")
+      limit: import_mcpBundle.z.number().default(50).describe("Max messages per connection"),
+      connectionUrl: import_mcpBundle.z.string().optional().describe("URL filter"),
+      clear: import_mcpBundle.z.boolean().default(false).describe("Clear buffer after reading")
     }),
     type: "readOnly"
   },
@@ -237,7 +237,7 @@ const wsMonitorStop = (0, import_tool.defineTabTool)({
   schema: {
     name: "browser_ws_stop",
     title: "Stop WebSocket monitor",
-    description: "Stop the WebSocket/SSE monitor and return a summary of all captured traffic.",
+    description: "Stop WebSocket/SSE monitor, return summary.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "action"
   },

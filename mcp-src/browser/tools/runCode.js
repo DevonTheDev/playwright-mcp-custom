@@ -50,10 +50,7 @@ function safeRequire(moduleName) {
 }
 
 const codeSchema = import_mcpBundle.z.object({
-  code: import_mcpBundle.z.string().describe(`JavaScript code to execute. Can be either:
-1. An arrow function receiving (page, browserContext): \`async (page, browserContext) => { ... }\`
-2. A plain code block that has 'page' and 'browserContext' in scope: \`const title = await page.title(); return title;\`
-Also available: require (fs, path, url, crypto), console, setTimeout, setInterval.`)
+  code: import_mcpBundle.z.string().describe("JS code: arrow function (page, browserContext) => {...} or plain code block. Has require(fs,path,url,crypto), console, setTimeout.")
 });
 
 const runCode = (0, import_tool.defineTabTool)({
@@ -61,7 +58,7 @@ const runCode = (0, import_tool.defineTabTool)({
   schema: {
     name: "browser_run_code",
     title: "Run Playwright code",
-    description: "Run Playwright code snippet with access to page, browserContext, and Node.js builtins (fs, path, url, crypto).",
+    description: "Run Playwright code with page, browserContext, and Node builtins.",
     inputSchema: codeSchema,
     type: "action"
   },

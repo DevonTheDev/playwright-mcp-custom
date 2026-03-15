@@ -33,12 +33,12 @@ const shellExec = (0, import_tool.defineTool)({
   schema: {
     name: "shell_exec",
     title: "Execute shell command",
-    description: "Execute a shell command and return stdout/stderr. Uses cmd.exe on Windows. Useful for running build tools, processing files, querying databases, git operations, etc.",
+    description: "Run a shell command, return stdout/stderr.",
     inputSchema: import_mcpBundle.z.object({
-      command: import_mcpBundle.z.string().describe("Shell command to execute"),
-      cwd: import_mcpBundle.z.string().optional().describe("Working directory for the command. Defaults to current directory."),
-      timeout: import_mcpBundle.z.number().default(30000).describe("Timeout in milliseconds. Default 30000 (30s). Max 120000 (2min)."),
-      shell: import_mcpBundle.z.enum(["cmd", "powershell", "bash"]).default("cmd").describe("Shell to use. Default is cmd on Windows.")
+      command: import_mcpBundle.z.string().describe("Command"),
+      cwd: import_mcpBundle.z.string().optional().describe("Working directory"),
+      timeout: import_mcpBundle.z.number().default(30000).describe("Timeout ms (max 120000)"),
+      shell: import_mcpBundle.z.enum(["cmd", "powershell", "bash"]).default("cmd")
     }),
     type: "action"
   },
@@ -83,8 +83,8 @@ const shellExec = (0, import_tool.defineTool)({
       const lines = [];
       lines.push(`## Command\n\`${params.command}\``);
       if (output) {
-        lines.push(`\n## Output\n\`\`\`\n${output.slice(0, 50000)}\n\`\`\``);
-        if (output.length > 50000) lines.push(`\n(output truncated, ${output.length} total chars)`);
+        lines.push(`\n## Output\n\`\`\`\n${output.slice(0, 10000)}\n\`\`\``);
+        if (output.length > 10000) lines.push(`\n(output truncated, ${output.length} total chars)`);
       } else {
         lines.push("\n## Output\n(no output)");
       }
@@ -96,8 +96,8 @@ const shellExec = (0, import_tool.defineTool)({
       const exitCode = e.status ?? "unknown";
       const lines = [];
       lines.push(`## Command\n\`${params.command}\``);
-      if (stdout) lines.push(`\n## Stdout\n\`\`\`\n${stdout.slice(0, 25000)}\n\`\`\``);
-      if (stderr) lines.push(`\n## Stderr\n\`\`\`\n${stderr.slice(0, 25000)}\n\`\`\``);
+      if (stdout) lines.push(`\n## Stdout\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``);
+      if (stderr) lines.push(`\n## Stderr\n\`\`\`\n${stderr.slice(0, 5000)}\n\`\`\``);
       lines.push(`\n## Exit Code\n${exitCode}`);
       response.addTextResult(lines.join("\n"));
     }
@@ -111,10 +111,10 @@ const shellPowerShell = (0, import_tool.defineTool)({
   schema: {
     name: "shell_powershell",
     title: "Run PowerShell script",
-    description: "Execute a PowerShell script. Convenient shorthand for shell_exec with shell=powershell. Full .NET access available.",
+    description: "Run a PowerShell script with .NET access.",
     inputSchema: import_mcpBundle.z.object({
-      script: import_mcpBundle.z.string().describe("PowerShell script to execute"),
-      timeout: import_mcpBundle.z.number().default(30000).describe("Timeout in milliseconds. Default 30000.")
+      script: import_mcpBundle.z.string().describe("Script"),
+      timeout: import_mcpBundle.z.number().default(30000).describe("Timeout ms")
     }),
     type: "action"
   },
@@ -128,8 +128,8 @@ const shellPowerShell = (0, import_tool.defineTool)({
       const output = stdout.trim();
       const lines = [];
       if (output) {
-        lines.push(`\`\`\`\n${output.slice(0, 50000)}\n\`\`\``);
-        if (output.length > 50000) lines.push(`(truncated, ${output.length} total chars)`);
+        lines.push(`\`\`\`\n${output.slice(0, 10000)}\n\`\`\``);
+        if (output.length > 10000) lines.push(`(truncated, ${output.length} total chars)`);
       } else {
         lines.push("(no output)");
       }
@@ -138,8 +138,8 @@ const shellPowerShell = (0, import_tool.defineTool)({
       const stdout = e.stdout ? e.stdout.toString().trim() : "";
       const stderr = e.stderr ? e.stderr.toString().trim() : "";
       const lines = [];
-      if (stdout) lines.push(`Stdout:\n\`\`\`\n${stdout.slice(0, 25000)}\n\`\`\``);
-      if (stderr) lines.push(`Stderr:\n\`\`\`\n${stderr.slice(0, 25000)}\n\`\`\``);
+      if (stdout) lines.push(`Stdout:\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``);
+      if (stderr) lines.push(`Stderr:\n\`\`\`\n${stderr.slice(0, 5000)}\n\`\`\``);
       lines.push(`Exit code: ${e.status ?? "unknown"}`);
       response.addTextResult(lines.join("\n"));
     }

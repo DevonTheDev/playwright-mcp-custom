@@ -49,7 +49,7 @@ const clipboardRead = (0, import_tool.defineTool)({
   schema: {
     name: "clipboard_read",
     title: "Read clipboard",
-    description: "Read text content from the system clipboard.",
+    description: "Read text from system clipboard.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "readOnly"
   },
@@ -71,9 +71,9 @@ const clipboardWrite = (0, import_tool.defineTool)({
   schema: {
     name: "clipboard_write",
     title: "Write clipboard",
-    description: "Write text content to the system clipboard.",
+    description: "Write text to system clipboard.",
     inputSchema: import_mcpBundle.z.object({
-      text: import_mcpBundle.z.string().describe("Text to write to clipboard")
+      text: import_mcpBundle.z.string().describe("Text")
     }),
     type: "action"
   },
@@ -99,9 +99,9 @@ const clipboardReadImage = (0, import_tool.defineTool)({
   schema: {
     name: "clipboard_read_image",
     title: "Read clipboard image",
-    description: "Read an image from the system clipboard (if one is present). Returns the image.",
+    description: "Read image from clipboard as PNG.",
     inputSchema: import_mcpBundle.z.object({
-      filename: import_mcpBundle.z.string().optional().describe("Filename to save as. Defaults to clipboard-{timestamp}.png")
+      filename: import_mcpBundle.z.string().optional().describe("Filename")
     }),
     type: "readOnly"
   },

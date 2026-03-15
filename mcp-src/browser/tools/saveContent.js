@@ -31,10 +31,10 @@ const browserSaveContent = (0, import_tool.defineTool)({
   schema: {
     name: "browser_save_content",
     title: "Save content to file",
-    description: "Save text content (HTML, JSON, extracted text, etc.) to a file on disk.",
+    description: "Save text content to a file.",
     inputSchema: import_mcpBundle.z.object({
-      content: import_mcpBundle.z.string().describe("Text content to save."),
-      filename: import_mcpBundle.z.string().describe("Filename to save as (e.g. 'page.html', 'data.json').")
+      content: import_mcpBundle.z.string().describe("Content"),
+      filename: import_mcpBundle.z.string().describe("Filename")
     }),
     type: "action"
   },

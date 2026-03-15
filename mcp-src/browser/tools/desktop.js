@@ -119,10 +119,10 @@ const desktopScreenshot = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_screenshot",
     title: "Desktop screenshot",
-    description: "Take a screenshot of the entire desktop or a specific window. Returns the image so you can see what is on screen.",
+    description: "Screenshot the desktop or a specific window.",
     inputSchema: import_mcpBundle.z.object({
-      windowTitle: import_mcpBundle.z.string().optional().describe("If provided, capture only the window matching this title (partial match). Otherwise captures full desktop."),
-      filename: import_mcpBundle.z.string().optional().describe("Filename to save screenshot as. Defaults to desktop-{timestamp}.png")
+      windowTitle: import_mcpBundle.z.string().optional().describe("Window title to capture (partial match). Omit for full desktop."),
+      filename: import_mcpBundle.z.string().optional().describe("Filename to save as")
     }),
     type: "readOnly"
   },
@@ -192,12 +192,12 @@ const desktopClick = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_click",
     title: "Desktop click",
-    description: "Click at specific screen coordinates. Use desktop_screenshot first to identify targets.",
+    description: "Click at screen coordinates.",
     inputSchema: import_mcpBundle.z.object({
-      x: import_mcpBundle.z.number().describe("X coordinate on screen"),
-      y: import_mcpBundle.z.number().describe("Y coordinate on screen"),
-      button: import_mcpBundle.z.enum(["left", "right", "middle"]).default("left").describe("Mouse button to click"),
-      doubleClick: import_mcpBundle.z.boolean().default(false).describe("Whether to double-click")
+      x: import_mcpBundle.z.number().describe("X"),
+      y: import_mcpBundle.z.number().describe("Y"),
+      button: import_mcpBundle.z.enum(["left", "right", "middle"]).default("left"),
+      doubleClick: import_mcpBundle.z.boolean().default(false)
     }),
     type: "action"
   },
@@ -233,9 +233,9 @@ const desktopType = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_type",
     title: "Desktop type text",
-    description: "Type text at the current cursor position / focused window using keyboard simulation.",
+    description: "Type text at current focus.",
     inputSchema: import_mcpBundle.z.object({
-      text: import_mcpBundle.z.string().describe("Text to type. Special characters are auto-escaped.")
+      text: import_mcpBundle.z.string().describe("Text to type")
     }),
     type: "action"
   },
@@ -259,9 +259,9 @@ const desktopKey = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_key",
     title: "Desktop key press",
-    description: 'Press a key or key combination. Examples: "enter", "ctrl+c", "alt+tab", "ctrl+shift+s", "f5", "escape"',
+    description: "Press a key combo (e.g. ctrl+c, alt+tab, f5).",
     inputSchema: import_mcpBundle.z.object({
-      key: import_mcpBundle.z.string().describe('Key combo like "ctrl+c", "alt+tab", "enter", "f5", "ctrl+shift+s"')
+      key: import_mcpBundle.z.string().describe("Key combo")
     }),
     type: "action"
   },
@@ -285,10 +285,10 @@ const desktopMouseMove = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_mouse_move",
     title: "Move mouse",
-    description: "Move the mouse cursor to specific screen coordinates.",
+    description: "Move mouse to screen coordinates.",
     inputSchema: import_mcpBundle.z.object({
-      x: import_mcpBundle.z.number().describe("X coordinate"),
-      y: import_mcpBundle.z.number().describe("Y coordinate")
+      x: import_mcpBundle.z.number().describe("X"),
+      y: import_mcpBundle.z.number().describe("Y")
     }),
     type: "action"
   },
@@ -311,12 +311,12 @@ const desktopScroll = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_scroll",
     title: "Desktop scroll",
-    description: "Scroll the mouse wheel at the current position or at specified coordinates.",
+    description: "Scroll mouse wheel.",
     inputSchema: import_mcpBundle.z.object({
-      direction: import_mcpBundle.z.enum(["up", "down"]).describe("Scroll direction"),
-      clicks: import_mcpBundle.z.number().default(3).describe("Number of scroll clicks (each is 120 units)"),
-      x: import_mcpBundle.z.number().optional().describe("X coordinate to scroll at (optional, uses current position if omitted)"),
-      y: import_mcpBundle.z.number().optional().describe("Y coordinate to scroll at (optional)")
+      direction: import_mcpBundle.z.enum(["up", "down"]),
+      clicks: import_mcpBundle.z.number().default(3),
+      x: import_mcpBundle.z.number().optional().describe("X (optional)"),
+      y: import_mcpBundle.z.number().optional().describe("Y (optional)")
     }),
     type: "action"
   },
@@ -344,7 +344,7 @@ const desktopListWindows = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_list_windows",
     title: "List windows",
-    description: "List all visible windows with their process IDs, names, and titles.",
+    description: "List visible windows with PIDs and titles.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "readOnly"
   },
@@ -387,11 +387,11 @@ const desktopFocusWindow = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_focus_window",
     title: "Focus window",
-    description: "Bring a window to the foreground by process ID or title match.",
+    description: "Focus/minimize/maximize a window by PID or title.",
     inputSchema: import_mcpBundle.z.object({
-      pid: import_mcpBundle.z.number().optional().describe("Process ID of the window to focus"),
-      title: import_mcpBundle.z.string().optional().describe("Partial window title to match (case-insensitive)"),
-      action: import_mcpBundle.z.enum(["focus", "minimize", "maximize", "restore"]).default("focus").describe("Action to perform on the window")
+      pid: import_mcpBundle.z.number().optional().describe("Process ID"),
+      title: import_mcpBundle.z.string().optional().describe("Window title (partial match)"),
+      action: import_mcpBundle.z.enum(["focus", "minimize", "maximize", "restore"]).default("focus")
     }),
     type: "action"
   },
@@ -431,11 +431,11 @@ const desktopLaunch = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_launch",
     title: "Launch application",
-    description: 'Launch an application or open a file. Examples: "notepad", "calc", "C:\\\\path\\\\to\\\\app.exe", "https://example.com"',
+    description: "Launch an application, file, or URL.",
     inputSchema: import_mcpBundle.z.object({
-      command: import_mcpBundle.z.string().describe("Application name, path, or URL to launch"),
-      args: import_mcpBundle.z.string().optional().describe("Command-line arguments"),
-      waitForWindow: import_mcpBundle.z.boolean().default(true).describe("Wait briefly for the window to appear")
+      command: import_mcpBundle.z.string().describe("App name, path, or URL"),
+      args: import_mcpBundle.z.string().optional().describe("Arguments"),
+      waitForWindow: import_mcpBundle.z.boolean().default(true)
     }),
     type: "action"
   },
@@ -461,7 +461,7 @@ const desktopCursorPos = (0, import_tool.defineTool)({
   schema: {
     name: "desktop_cursor_position",
     title: "Get cursor position",
-    description: "Get the current mouse cursor position on screen.",
+    description: "Get current cursor position.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "readOnly"
   },

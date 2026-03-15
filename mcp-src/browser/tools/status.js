@@ -31,7 +31,7 @@ const browserStatus = (0, import_tool.defineTool)({
   schema: {
     name: "browser_status",
     title: "Browser status",
-    description: "Get browser health status including open tabs, modal states, and connection info.",
+    description: "Browser health: tabs, modals, connection status.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "readOnly"
   },

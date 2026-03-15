@@ -30,7 +30,7 @@ const browserTabList = (0, import_tool.defineTool)({
   schema: {
     name: "browser_tab_list",
     title: "List tabs",
-    description: "List all open browser tabs with their IDs, titles, and URLs.",
+    description: "List open tabs.",
     inputSchema: import_mcpBundle.z.object({}),
     type: "readOnly"
   },
@@ -47,9 +47,9 @@ const browserTabNew = (0, import_tool.defineTool)({
   schema: {
     name: "browser_tab_new",
     title: "Open new tab",
-    description: "Open a new browser tab, optionally navigating to a URL.",
+    description: "Open new tab, optionally navigate to URL.",
     inputSchema: import_mcpBundle.z.object({
-      url: import_mcpBundle.z.string().optional().describe("URL to navigate to in the new tab. If omitted, opens about:blank.")
+      url: import_mcpBundle.z.string().optional().describe("URL (optional)")
     }),
     type: "action"
   },
@@ -71,9 +71,9 @@ const browserTabClose = (0, import_tool.defineTool)({
   schema: {
     name: "browser_tab_close",
     title: "Close tab",
-    description: "Close a browser tab by its stable ID. If no ID is given, closes the current tab.",
+    description: "Close a tab by ID (omit for current).",
     inputSchema: import_mcpBundle.z.object({
-      tabId: import_mcpBundle.z.number().optional().describe("Tab ID to close. If omitted, closes the current tab.")
+      tabId: import_mcpBundle.z.number().optional().describe("Tab ID")
     }),
     type: "action"
   },
@@ -91,9 +91,9 @@ const browserTabSelect = (0, import_tool.defineTool)({
   schema: {
     name: "browser_tab_select",
     title: "Select tab",
-    description: "Switch to a browser tab by its stable ID. Automatically returns a snapshot of the selected tab.",
+    description: "Switch to a tab by ID (returns snapshot).",
     inputSchema: import_mcpBundle.z.object({
-      tabId: import_mcpBundle.z.number().describe("Tab ID to select.")
+      tabId: import_mcpBundle.z.number().describe("Tab ID")
     }),
     type: "action"
   },
