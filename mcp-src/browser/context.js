@@ -46,6 +46,8 @@ class Context {
     this._routes = [];
     this._abortController = new AbortController();
     this._closeGraceTimer = null;
+    this._nextTabId = 1;
+    this._tabIdMap = new Map();
     this.config = options.config;
     this.sessionLog = options.sessionLog;
     this.options = options;
@@ -77,10 +79,10 @@ class Context {
     this._currentTab = this._tabs.find((t) => t.page === page);
     return this._currentTab;
   }
-  async selectTab(index) {
-    const tab = this._tabs[index];
+  async selectTab(tabId) {
+    const tab = this._tabIdMap.get(tabId);
     if (!tab)
-      throw new Error(`Tab ${index} not found`);
+      throw new Error(`Tab with ID ${tabId} not found`);
     await tab.page.bringToFront();
     this._currentTab = tab;
     return tab;
@@ -91,10 +93,10 @@ class Context {
       await browserContext.newPage();
     return this._currentTab;
   }
-  async closeTab(index) {
-    const tab = index === void 0 ? this._currentTab : this._tabs[index];
+  async closeTab(tabId) {
+    const tab = tabId === void 0 ? this._currentTab : this._tabIdMap.get(tabId);
     if (!tab)
-      throw new Error(`Tab ${index} not found`);
+      throw new Error(`Tab with ID ${tabId} not found`);
     const url = tab.page.url();
     await tab.page.close();
     return url;
@@ -139,8 +141,11 @@ class Context {
       this._closeGraceTimer = null;
       testDebug("grace period cancelled - new tab opened");
     }
+    const tabId = this._nextTabId++;
     const tab = new import_tab.Tab(this, page, (tab2) => this._onPageClosed(tab2));
+    tab._tabId = tabId;
     this._tabs.push(tab);
+    this._tabIdMap.set(tabId, tab);
     if (!this._currentTab)
       this._currentTab = tab;
   }
@@ -149,6 +154,8 @@ class Context {
     if (index === -1)
       return;
     this._tabs.splice(index, 1);
+    if (tab._tabId)
+      this._tabIdMap.delete(tab._tabId);
     if (this._currentTab === tab)
       this._currentTab = this._tabs[Math.min(index, this._tabs.length - 1)];
     if (!this._tabs.length) {

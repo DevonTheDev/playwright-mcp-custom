@@ -177,6 +177,7 @@ class Tab extends import_events.EventEmitter {
       title = await (0, import_utils2.callOnPageNoTrace)(this.page, (page) => page.title());
     });
     const newHeader = {
+      tabId: this._tabId,
       title: title ?? "",
       url: this.page.url(),
       current: this.isCurrentTab(),

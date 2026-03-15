@@ -208,7 +208,8 @@ function renderTabsMarkdown(tabs) {
   for (let i = 0; i < tabs.length; i++) {
     const tab = tabs[i];
     const current = tab.current ? " (current)" : "";
-    lines.push(`- ${i}:${current} [${tab.title}](${tab.url})`);
+    const id = tab.tabId != null ? tab.tabId : i;
+    lines.push(`- tab ${id}:${current} [${tab.title}](${tab.url})`);
   }
   return lines;
 }
