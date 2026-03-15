@@ -127,14 +127,25 @@ const initializeServer = async (server, backend, runHeartbeat) => {
     startHeartbeat(server);
 };
 const startHeartbeat = (server) => {
+  const backoffDelays = [5e3, 10e3, 15e3];
+  let failureCount = 0;
   const beat = () => {
     Promise.race([
       server.ping(),
       new Promise((_, reject) => setTimeout(() => reject(new Error("ping timeout")), 5e3))
     ]).then(() => {
+      failureCount = 0;
       setTimeout(beat, 3e3);
     }).catch(() => {
-      void server.close();
+      if (failureCount < backoffDelays.length) {
+        const delay = backoffDelays[failureCount];
+        failureCount++;
+        serverDebug(`heartbeat failed (attempt ${failureCount}/${backoffDelays.length}), retrying in ${delay / 1e3}s`);
+        setTimeout(beat, delay);
+      } else {
+        serverDebug("heartbeat failed after all retries, closing server");
+        void server.close();
+      }
     });
   };
   beat();
