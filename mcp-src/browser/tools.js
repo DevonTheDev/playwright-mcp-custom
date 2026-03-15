@@ -32,10 +32,12 @@ __export(tools_exports, {
   filteredTools: () => filteredTools
 });
 module.exports = __toCommonJS(tools_exports);
+var import_clipboard = __toESM(require("./tools/clipboard"));
 var import_common = __toESM(require("./tools/common"));
 var import_config = __toESM(require("./tools/config"));
 var import_console = __toESM(require("./tools/console"));
 var import_cookies = __toESM(require("./tools/cookies"));
+var import_desktop = __toESM(require("./tools/desktop"));
 var import_devtools = __toESM(require("./tools/devtools"));
 var import_dialogs = __toESM(require("./tools/dialogs"));
 var import_download = __toESM(require("./tools/download"));
@@ -48,9 +50,11 @@ var import_mouse = __toESM(require("./tools/mouse"));
 var import_navigate = __toESM(require("./tools/navigate"));
 var import_network = __toESM(require("./tools/network"));
 var import_pdf = __toESM(require("./tools/pdf"));
+var import_persistentState = __toESM(require("./tools/persistentState"));
 var import_route = __toESM(require("./tools/route"));
 var import_runCode = __toESM(require("./tools/runCode"));
 var import_saveContent = __toESM(require("./tools/saveContent"));
+var import_shell = __toESM(require("./tools/shell"));
 var import_snapshot = __toESM(require("./tools/snapshot"));
 var import_screenshot = __toESM(require("./tools/screenshot"));
 var import_status = __toESM(require("./tools/status"));
@@ -60,12 +64,15 @@ var import_tracing = __toESM(require("./tools/tracing"));
 var import_verify = __toESM(require("./tools/verify"));
 var import_video = __toESM(require("./tools/video"));
 var import_wait = __toESM(require("./tools/wait"));
+var import_websocketMonitor = __toESM(require("./tools/websocketMonitor"));
 var import_webstorage = __toESM(require("./tools/webstorage"));
 const browserTools = [
+  ...import_clipboard.default,
   ...import_common.default,
   ...import_config.default,
   ...import_console.default,
   ...import_cookies.default,
+  ...import_desktop.default,
   ...import_devtools.default,
   ...import_dialogs.default,
   ...import_download.default,
@@ -78,9 +85,11 @@ const browserTools = [
   ...import_navigate.default,
   ...import_network.default,
   ...import_pdf.default,
+  ...import_persistentState.default,
   ...import_route.default,
   ...import_runCode.default,
   ...import_saveContent.default,
+  ...import_shell.default,
   ...import_screenshot.default,
   ...import_snapshot.default,
   ...import_status.default,
@@ -90,6 +99,7 @@ const browserTools = [
   ...import_verify.default,
   ...import_video.default,
   ...import_wait.default,
+  ...import_websocketMonitor.default,
   ...import_webstorage.default
 ];
 function filteredTools(config2) {

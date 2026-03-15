@@ -1,0 +1,493 @@
+"use strict";
+var __defProp = Object.defineProperty;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var desktop_exports = {};
+__export(desktop_exports, {
+  default: () => desktop_default
+});
+module.exports = __toCommonJS(desktop_exports);
+
+const { execSync } = require("child_process");
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+var import_mcpBundle = require("playwright-core/lib/mcpBundle");
+var import_tool = require("./tool");
+
+// ── PowerShell helpers ──────────────────────────────────────────────
+
+function runPowerShell(script, timeout = 15000) {
+  try {
+    const result = execSync(
+      "powershell.exe -NoProfile -NonInteractive -Command -",
+      { input: script, encoding: "utf-8", timeout, windowsHide: true }
+    );
+    return { success: true, output: result.trim() };
+  } catch (e) {
+    const stderr = e.stderr ? e.stderr.toString().trim() : "";
+    return { success: false, error: stderr || e.message || String(e) };
+  }
+}
+
+const WIN32_TYPES = `
+Add-Type -ErrorAction SilentlyContinue @"
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+public class Win32Input {
+    [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
+    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, IntPtr dwExtraInfo);
+    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+    [DllImport("user32.dll", CharSet=CharSet.Auto)]
+    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
+    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT lpPoint);
+    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
+    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
+    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
+    public const uint LEFTDOWN = 0x0002, LEFTUP = 0x0004;
+    public const uint RIGHTDOWN = 0x0008, RIGHTUP = 0x0010;
+    public const uint MIDDLEDOWN = 0x0020, MIDDLEUP = 0x0040;
+    public const uint WHEEL = 0x0800;
+    public const int SW_RESTORE = 9, SW_SHOW = 5, SW_MINIMIZE = 6, SW_MAXIMIZE = 3;
+}
+"@
+`;
+
+// ── Key combo mapping ───────────────────────────────────────────────
+
+function keyComboToSendKeys(combo) {
+  const keyMap = {
+    "enter": "{ENTER}", "return": "{ENTER}",
+    "tab": "{TAB}", "escape": "{ESC}", "esc": "{ESC}",
+    "backspace": "{BACKSPACE}", "bs": "{BACKSPACE}",
+    "delete": "{DELETE}", "del": "{DELETE}",
+    "insert": "{INSERT}", "ins": "{INSERT}",
+    "home": "{HOME}", "end": "{END}",
+    "pageup": "{PGUP}", "pagedown": "{PGDN}",
+    "up": "{UP}", "down": "{DOWN}", "left": "{LEFT}", "right": "{RIGHT}",
+    "f1": "{F1}", "f2": "{F2}", "f3": "{F3}", "f4": "{F4}",
+    "f5": "{F5}", "f6": "{F6}", "f7": "{F7}", "f8": "{F8}",
+    "f9": "{F9}", "f10": "{F10}", "f11": "{F11}", "f12": "{F12}",
+    "space": " ", "plus": "{+}", "caret": "{^}", "tilde": "{~}",
+    "prtsc": "{PRTSC}", "break": "{BREAK}", "capslock": "{CAPSLOCK}",
+    "scrolllock": "{SCROLLLOCK}", "numlock": "{NUMLOCK}",
+    "win": "^{ESC}", "apps": "+{F10}"
+  };
+
+  const parts = combo.toLowerCase().split("+").map(s => s.trim());
+  let modifiers = "";
+  let key = "";
+
+  for (const part of parts) {
+    if (part === "ctrl" || part === "control") modifiers += "^";
+    else if (part === "alt") modifiers += "%";
+    else if (part === "shift") modifiers += "+";
+    else if (keyMap[part]) key = keyMap[part];
+    else if (part.length === 1) key = part;
+    else key = `{${part.toUpperCase()}}`;
+  }
+
+  return modifiers + (key.startsWith("{") ? key : key);
+}
+
+function escapeSendKeys(text) {
+  return text.replace(/([{}+^%~()[\]])/g, "{$1}");
+}
+
+// ── Desktop Screenshot ──────────────────────────────────────────────
+
+const desktopScreenshot = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_screenshot",
+    title: "Desktop screenshot",
+    description: "Take a screenshot of the entire desktop or a specific window. Returns the image so you can see what is on screen.",
+    inputSchema: import_mcpBundle.z.object({
+      windowTitle: import_mcpBundle.z.string().optional().describe("If provided, capture only the window matching this title (partial match). Otherwise captures full desktop."),
+      filename: import_mcpBundle.z.string().optional().describe("Filename to save screenshot as. Defaults to desktop-{timestamp}.png")
+    }),
+    type: "readOnly"
+  },
+  handle: async (context, params, response) => {
+    const tempFile = path.join(os.tmpdir(), `desktop-screenshot-${Date.now()}.png`);
+
+    let script;
+    const safePath = tempFile.replace(/\\/g, "\\\\");
+    if (params.windowTitle) {
+      // Capture specific window
+      const escapedTitle = params.windowTitle.replace(/'/g, "''");
+      script = `
+${WIN32_TYPES}
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$proc = Get-Process | Where-Object { $_.MainWindowTitle -like '*${escapedTitle}*' -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+if (-not $proc) { Write-Error "No window found matching '${escapedTitle}'"; exit 1 }
+$hwnd = $proc.MainWindowHandle
+[Win32Input]::ShowWindow($hwnd, [Win32Input]::SW_RESTORE) | Out-Null
+Start-Sleep -Milliseconds 200
+$rect = New-Object Win32Input+RECT
+[Win32Input]::GetWindowRect($hwnd, [ref]$rect) | Out-Null
+$w = $rect.Right - $rect.Left; $h = $rect.Bottom - $rect.Top
+if ($w -le 0 -or $h -le 0) { Write-Error "Invalid window dimensions"; exit 1 }
+$bitmap = New-Object System.Drawing.Bitmap($w, $h)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.CopyFromScreen($rect.Left, $rect.Top, 0, 0, (New-Object System.Drawing.Size($w, $h)))
+$bitmap.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose(); $bitmap.Dispose()
+Write-Output '${safePath}'
+`;
+    } else {
+      // Full desktop capture using PrimaryScreen (most reliable)
+      script = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bounds.Size)
+$bitmap.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose(); $bitmap.Dispose()
+Write-Output '${safePath}'
+`;
+    }
+
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Screenshot failed: ${result.error}`);
+
+    const data = fs.readFileSync(tempFile);
+    const resolvedFile = await response.resolveClientFile(
+      { prefix: "desktop", ext: "png", suggestedFilename: params.filename },
+      "Desktop screenshot"
+    );
+    await response.addFileResult(resolvedFile, data);
+    await response.registerImageResult(data, "png");
+
+    // Clean up temp file
+    try { fs.unlinkSync(tempFile); } catch (e) {}
+  }
+});
+
+// ── Desktop Click ───────────────────────────────────────────────────
+
+const desktopClick = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_click",
+    title: "Desktop click",
+    description: "Click at specific screen coordinates. Use desktop_screenshot first to identify targets.",
+    inputSchema: import_mcpBundle.z.object({
+      x: import_mcpBundle.z.number().describe("X coordinate on screen"),
+      y: import_mcpBundle.z.number().describe("Y coordinate on screen"),
+      button: import_mcpBundle.z.enum(["left", "right", "middle"]).default("left").describe("Mouse button to click"),
+      doubleClick: import_mcpBundle.z.boolean().default(false).describe("Whether to double-click")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const btnDown = params.button === "right" ? "RIGHTDOWN" : params.button === "middle" ? "MIDDLEDOWN" : "LEFTDOWN";
+    const btnUp = params.button === "right" ? "RIGHTUP" : params.button === "middle" ? "MIDDLEUP" : "LEFTUP";
+    const clicks = params.doubleClick ? 2 : 1;
+
+    let clickCode = "";
+    for (let i = 0; i < clicks; i++) {
+      clickCode += `[Win32Input]::mouse_event([Win32Input]::${btnDown}, 0, 0, 0, [IntPtr]::Zero)\n`;
+      clickCode += `[Win32Input]::mouse_event([Win32Input]::${btnUp}, 0, 0, 0, [IntPtr]::Zero)\n`;
+      if (i < clicks - 1) clickCode += `Start-Sleep -Milliseconds 50\n`;
+    }
+
+    const script = `
+${WIN32_TYPES}
+[Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null
+Start-Sleep -Milliseconds 50
+${clickCode}
+Write-Output "Clicked at (${params.x}, ${params.y})"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Click failed: ${result.error}`);
+    response.addTextResult(`${params.doubleClick ? "Double-clicked" : "Clicked"} ${params.button} button at (${params.x}, ${params.y})`);
+  }
+});
+
+// ── Desktop Type ────────────────────────────────────────────────────
+
+const desktopType = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_type",
+    title: "Desktop type text",
+    description: "Type text at the current cursor position / focused window using keyboard simulation.",
+    inputSchema: import_mcpBundle.z.object({
+      text: import_mcpBundle.z.string().describe("Text to type. Special characters are auto-escaped.")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const escaped = escapeSendKeys(params.text);
+    const script = `
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.SendKeys]::SendWait('${escaped.replace(/'/g, "''")}')
+Write-Output "Typed text"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Type failed: ${result.error}`);
+    response.addTextResult(`Typed ${params.text.length} characters`);
+  }
+});
+
+// ── Desktop Key Press ───────────────────────────────────────────────
+
+const desktopKey = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_key",
+    title: "Desktop key press",
+    description: 'Press a key or key combination. Examples: "enter", "ctrl+c", "alt+tab", "ctrl+shift+s", "f5", "escape"',
+    inputSchema: import_mcpBundle.z.object({
+      key: import_mcpBundle.z.string().describe('Key combo like "ctrl+c", "alt+tab", "enter", "f5", "ctrl+shift+s"')
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const sendKeysStr = keyComboToSendKeys(params.key);
+    const script = `
+Add-Type -AssemblyName System.Windows.Forms
+[System.Windows.Forms.SendKeys]::SendWait('${sendKeysStr.replace(/'/g, "''")}')
+Write-Output "Pressed ${params.key}"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Key press failed: ${result.error}`);
+    response.addTextResult(`Pressed: ${params.key}`);
+  }
+});
+
+// ── Desktop Mouse Move ──────────────────────────────────────────────
+
+const desktopMouseMove = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_mouse_move",
+    title: "Move mouse",
+    description: "Move the mouse cursor to specific screen coordinates.",
+    inputSchema: import_mcpBundle.z.object({
+      x: import_mcpBundle.z.number().describe("X coordinate"),
+      y: import_mcpBundle.z.number().describe("Y coordinate")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const script = `
+${WIN32_TYPES}
+[Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null
+Write-Output "Moved to (${params.x}, ${params.y})"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Mouse move failed: ${result.error}`);
+    response.addTextResult(`Mouse moved to (${params.x}, ${params.y})`);
+  }
+});
+
+// ── Desktop Scroll ──────────────────────────────────────────────────
+
+const desktopScroll = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_scroll",
+    title: "Desktop scroll",
+    description: "Scroll the mouse wheel at the current position or at specified coordinates.",
+    inputSchema: import_mcpBundle.z.object({
+      direction: import_mcpBundle.z.enum(["up", "down"]).describe("Scroll direction"),
+      clicks: import_mcpBundle.z.number().default(3).describe("Number of scroll clicks (each is 120 units)"),
+      x: import_mcpBundle.z.number().optional().describe("X coordinate to scroll at (optional, uses current position if omitted)"),
+      y: import_mcpBundle.z.number().optional().describe("Y coordinate to scroll at (optional)")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const amount = (params.direction === "up" ? 1 : -1) * params.clicks * 120;
+    const moveCmd = (params.x != null && params.y != null) ? `[Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null\nStart-Sleep -Milliseconds 50` : "";
+    // For negative scroll values, we need to convert to uint32 via bitwise
+    const amountExpr = amount < 0 ? `([uint32](0x100000000 + ${amount}))` : `${amount}`;
+    const script = `
+${WIN32_TYPES}
+${moveCmd}
+[Win32Input]::mouse_event([Win32Input]::WHEEL, 0, 0, ${amountExpr}, [IntPtr]::Zero)
+Write-Output "Scrolled ${params.direction} ${params.clicks} clicks"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Scroll failed: ${result.error}`);
+    response.addTextResult(`Scrolled ${params.direction} ${params.clicks} clicks`);
+  }
+});
+
+// ── Desktop List Windows ────────────────────────────────────────────
+
+const desktopListWindows = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_list_windows",
+    title: "List windows",
+    description: "List all visible windows with their process IDs, names, and titles.",
+    inputSchema: import_mcpBundle.z.object({}),
+    type: "readOnly"
+  },
+  handle: async (context, params, response) => {
+    const script = `
+Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | ForEach-Object {
+    [PSCustomObject]@{
+        PID = $_.Id
+        Name = $_.ProcessName
+        Title = $_.MainWindowTitle
+        Responding = $_.Responding
+    }
+} | ConvertTo-Json -Depth 2
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`List windows failed: ${result.error}`);
+
+    let windows;
+    try {
+      windows = JSON.parse(result.output);
+      if (!Array.isArray(windows)) windows = [windows];
+    } catch (e) {
+      windows = [];
+    }
+
+    const lines = ["## Open Windows", ""];
+    for (const w of windows) {
+      const status = w.Responding ? "" : " (NOT RESPONDING)";
+      lines.push(`- **[${w.PID}]** ${w.Name}: ${w.Title}${status}`);
+    }
+    if (windows.length === 0) lines.push("No visible windows found.");
+    response.addTextResult(lines.join("\n"));
+  }
+});
+
+// ── Desktop Focus Window ────────────────────────────────────────────
+
+const desktopFocusWindow = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_focus_window",
+    title: "Focus window",
+    description: "Bring a window to the foreground by process ID or title match.",
+    inputSchema: import_mcpBundle.z.object({
+      pid: import_mcpBundle.z.number().optional().describe("Process ID of the window to focus"),
+      title: import_mcpBundle.z.string().optional().describe("Partial window title to match (case-insensitive)"),
+      action: import_mcpBundle.z.enum(["focus", "minimize", "maximize", "restore"]).default("focus").describe("Action to perform on the window")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    if (!params.pid && !params.title) throw new Error("Either pid or title must be provided");
+    const actionMap = { focus: 5, minimize: 6, maximize: 3, restore: 9 };
+    const swCmd = actionMap[params.action] || 5;
+
+    let findCmd;
+    if (params.pid) {
+      findCmd = `$proc = Get-Process -Id ${params.pid} -ErrorAction Stop`;
+    } else {
+      const escapedTitle = params.title.replace(/'/g, "''");
+      findCmd = `$proc = Get-Process | Where-Object { $_.MainWindowTitle -like '*${escapedTitle}*' -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
+if (-not $proc) { Write-Error "No window found matching '${escapedTitle}'"; exit 1 }`;
+    }
+
+    const script = `
+${WIN32_TYPES}
+${findCmd}
+$hwnd = $proc.MainWindowHandle
+[Win32Input]::ShowWindow($hwnd, ${swCmd}) | Out-Null
+Start-Sleep -Milliseconds 100
+[Win32Input]::SetForegroundWindow($hwnd) | Out-Null
+Write-Output "$($proc.ProcessName) - $($proc.MainWindowTitle)"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Focus window failed: ${result.error}`);
+    response.addTextResult(`Window ${params.action}: ${result.output}`);
+  }
+});
+
+// ── Desktop Launch App ──────────────────────────────────────────────
+
+const desktopLaunch = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_launch",
+    title: "Launch application",
+    description: 'Launch an application or open a file. Examples: "notepad", "calc", "C:\\\\path\\\\to\\\\app.exe", "https://example.com"',
+    inputSchema: import_mcpBundle.z.object({
+      command: import_mcpBundle.z.string().describe("Application name, path, or URL to launch"),
+      args: import_mcpBundle.z.string().optional().describe("Command-line arguments"),
+      waitForWindow: import_mcpBundle.z.boolean().default(true).describe("Wait briefly for the window to appear")
+    }),
+    type: "action"
+  },
+  handle: async (context, params, response) => {
+    const escapedCmd = params.command.replace(/'/g, "''");
+    const argsStr = params.args ? ` -ArgumentList '${params.args.replace(/'/g, "''")}'` : "";
+    const waitStr = params.waitForWindow ? `\nStart-Sleep -Milliseconds 1500` : "";
+    const script = `
+$proc = Start-Process -FilePath '${escapedCmd}'${argsStr} -PassThru
+${waitStr}
+Write-Output "Launched PID: $($proc.Id)"
+`;
+    const result = runPowerShell(script, 20000);
+    if (!result.success) throw new Error(`Launch failed: ${result.error}`);
+    response.addTextResult(`Launched: ${params.command} (${result.output})`);
+  }
+});
+
+// ── Desktop Get Cursor Position ─────────────────────────────────────
+
+const desktopCursorPos = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_cursor_position",
+    title: "Get cursor position",
+    description: "Get the current mouse cursor position on screen.",
+    inputSchema: import_mcpBundle.z.object({}),
+    type: "readOnly"
+  },
+  handle: async (context, params, response) => {
+    const script = `
+${WIN32_TYPES}
+$point = New-Object Win32Input+POINT
+[Win32Input]::GetCursorPos([ref]$point) | Out-Null
+Write-Output "$($point.X),$($point.Y)"
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`Get cursor position failed: ${result.error}`);
+    const [x, y] = result.output.split(",");
+    response.addTextResult(`Cursor position: (${x}, ${y})`);
+  }
+});
+
+var desktop_default = [
+  desktopScreenshot,
+  desktopClick,
+  desktopType,
+  desktopKey,
+  desktopMouseMove,
+  desktopScroll,
+  desktopListWindows,
+  desktopFocusWindow,
+  desktopLaunch,
+  desktopCursorPos
+];
