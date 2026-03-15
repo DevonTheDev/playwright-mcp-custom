@@ -18,10 +18,6 @@ var __copyProps = (to, from, except, desc) => {
   return to;
 };
 var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
-  // If the importer is in node compatibility mode or this is not an ESM
-  // file that has been converted to a CommonJS file using a Babel-
-  // compatible transform (i.e. "__esModule" has not been set), then set
-  // "default" to the CommonJS "module.exports" for node compatibility.
   isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
   mod
 ));
@@ -32,39 +28,103 @@ __export(runCode_exports, {
 });
 module.exports = __toCommonJS(runCode_exports);
 var import_vm = __toESM(require("vm"));
+var import_fs = __toESM(require("fs"));
+var import_path = __toESM(require("path"));
+var import_url = __toESM(require("url"));
+var import_crypto = __toESM(require("crypto"));
 var import_utils = require("playwright-core/lib/utils");
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
+
+const allowedModules = {
+  fs: import_fs.default,
+  path: import_path.default,
+  url: import_url.default,
+  crypto: import_crypto.default
+};
+
+function safeRequire(moduleName) {
+  if (allowedModules[moduleName])
+    return allowedModules[moduleName];
+  throw new Error(`Module "${moduleName}" is not allowed. Allowed modules: ${Object.keys(allowedModules).join(", ")}`);
+}
+
 const codeSchema = import_mcpBundle.z.object({
-  code: import_mcpBundle.z.string().describe(`A JavaScript function containing Playwright code to execute. It will be invoked with a single argument, page, which you can use for any page interaction. For example: \`async (page) => { await page.getByRole('button', { name: 'Submit' }).click(); return await page.title(); }\``)
+  code: import_mcpBundle.z.string().describe(`JavaScript code to execute. Can be either:
+1. An arrow function receiving (page, browserContext): \`async (page, browserContext) => { ... }\`
+2. A plain code block that has 'page' and 'browserContext' in scope: \`const title = await page.title(); return title;\`
+Also available: require (fs, path, url, crypto), console, setTimeout, setInterval.`)
 });
+
 const runCode = (0, import_tool.defineTabTool)({
   capability: "core",
   schema: {
     name: "browser_run_code",
     title: "Run Playwright code",
-    description: "Run Playwright code snippet",
+    description: "Run Playwright code snippet with access to page, browserContext, and Node.js builtins (fs, path, url, crypto).",
     inputSchema: codeSchema,
     type: "action"
   },
   handle: async (tab, params, response) => {
-    response.addCode(`await (${params.code})(page);`);
+    const code = params.code.trim();
+    const isArrowOrFunction = /^(async\s+)?(function|\()/.test(code);
+
+    // Get or create persistent VM context on the Context object
+    if (!tab.context._vmContext) {
+      const vmCtx = {
+        console,
+        setTimeout,
+        setInterval,
+        clearTimeout,
+        clearInterval,
+        require: safeRequire,
+        Buffer,
+        URL,
+        URLSearchParams,
+        TextEncoder,
+        TextDecoder,
+        JSON,
+        Promise,
+        // Persistent state across calls
+        __state__: {}
+      };
+      import_vm.default.createContext(vmCtx);
+      tab.context._vmContext = vmCtx;
+    }
+
+    const vmContext = tab.context._vmContext;
+    // Update per-call bindings
+    vmContext.page = tab.page;
+    vmContext.browserContext = await tab.context.ensureBrowserContext();
+
     const __end__ = new import_utils.ManualPromise();
-    const context = {
-      page: tab.page,
-      __end__
-    };
-    import_vm.default.createContext(context);
-    await tab.waitForCompletion(async () => {
-      const snippet = `(async () => {
+    vmContext.__end__ = __end__;
+
+    let snippet;
+    if (isArrowOrFunction) {
+      response.addCode(`await (${code})(page, browserContext);`);
+      snippet = `(async () => {
         try {
-          const result = await (${params.code})(page);
+          const result = await (${code})(page, browserContext);
           __end__.resolve(JSON.stringify(result));
         } catch (e) {
           __end__.reject(e);
         }
       })()`;
-      await import_vm.default.runInContext(snippet, context);
+    } else {
+      response.addCode(code);
+      snippet = `(async () => {
+        try {
+          const result = await (async () => { ${code} })();
+          __end__.resolve(JSON.stringify(result));
+        } catch (e) {
+          __end__.reject(e);
+        }
+      })()`;
+    }
+
+    await tab.waitForCompletion(async () => {
+      await import_vm.default.runInContext(snippet, vmContext);
       const result = await __end__;
       if (typeof result === "string")
         response.addTextResult(result);
