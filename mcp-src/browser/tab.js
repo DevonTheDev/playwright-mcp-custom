@@ -30,7 +30,7 @@ var import_log = require("../log");
 var import_logFile = require("./logFile");
 var import_dialogs = require("./tools/dialogs");
 var import_files = require("./tools/files");
-var import_transform = require("../../transform/transform");
+var import_transform = require("playwright/lib/transform/transform");
 const TabEvents = {
   modalState: "modalState"
 };

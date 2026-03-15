@@ -16,7 +16,7 @@
  */
 
 const { program } = require('playwright-core/lib/utilsBundle');
-const { decorateMCPCommand } = require('playwright/lib/mcp/program');
+const { decorateMCPCommand } = require('./mcp-src/program');
 
 const packageJSON = require('./package.json');
 const p = program.version('Version ' + packageJSON.version).name('Playwright MCP');

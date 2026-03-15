@@ -56,7 +56,7 @@ var import_server = require("playwright-core/lib/server");
 var import_playwright_core = require("playwright-core");
 var import_utilsBundle = require("playwright-core/lib/utilsBundle");
 var import_configIni = require("./configIni");
-var import_util = require("../../util");
+var import_util = require("playwright/lib/util");
 var import_server2 = require("../sdk/server");
 const defaultConfig = {
   browser: {
