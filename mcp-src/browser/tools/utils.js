@@ -33,7 +33,7 @@ async function waitForCompletion(tab, callback) {
   let result;
   try {
     result = await callback();
-    await tab.waitForTimeout(500);
+    await tab.waitForTimeout(100);
   } finally {
     disposeListeners();
   }
@@ -55,7 +55,7 @@ async function waitForCompletion(tab, callback) {
   const timeout = new Promise((resolve) => setTimeout(resolve, 5e3));
   await Promise.race([Promise.all(promises), timeout]);
   if (requests.length)
-    await tab.waitForTimeout(500);
+    await tab.waitForTimeout(100);
   return result;
 }
 async function callOnPageNoTrace(page, callback) {

@@ -332,7 +332,7 @@ class Tab extends import_events.EventEmitter {
       return;
     }
     await (0, import_utils2.callOnPageNoTrace)(this.page, (page) => {
-      return page.evaluate(() => new Promise((f) => setTimeout(f, 1e3))).catch(() => {
+      return page.evaluate((t) => new Promise((f) => setTimeout(f, t)), time).catch(() => {
       });
     });
   }
