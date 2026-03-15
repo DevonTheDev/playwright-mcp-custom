@@ -393,8 +393,16 @@ const desktopFocusWindow = (0, import_tool.defineTool)({
 if (-not $proc) { Write-Error "No window found matching '${escapedTitle}'"; exit 1 }`;
     }
 
-    const script = `
-
+    const script = params.action === "focus"
+      // Focus only: just bring to foreground without changing window size/state
+      ? `
+${findCmd}
+$hwnd = $proc.MainWindowHandle
+[Win32Input]::SetForegroundWindow($hwnd) | Out-Null
+Write-Output "$($proc.ProcessName) - $($proc.MainWindowTitle)"
+`
+      // Minimize/maximize/restore: call ShowWindow then foreground
+      : `
 ${findCmd}
 $hwnd = $proc.MainWindowHandle
 [Win32Input]::ShowWindow($hwnd, ${swCmd}) | Out-Null
