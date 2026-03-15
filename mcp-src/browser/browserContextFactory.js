@@ -197,8 +197,15 @@ class PersistentContextFactory {
         ignoreDefaultArgs: [
           "--disable-extensions"
         ],
+        args: [
+          ...(this.config.browser.launchOptions?.args || []),
+          "--disable-session-crashed-bubble",
+          "--hide-crash-restore-bubble"
+        ],
         assistantMode: true
       };
+      // Clear crash recovery state before launch so Chrome doesn't show restore prompt
+      await clearCrashRecoveryState(userDataDir);
       try {
         const browserContext = await browserType.launchPersistentContext(userDataDir, launchOptions);
         await addInitScript(browserContext, this.config.browser.initScript);
@@ -269,6 +276,22 @@ function createHash(data) {
 async function addInitScript(browserContext, initScript) {
   for (const scriptPath of initScript ?? [])
     await browserContext.addInitScript({ path: import_path.default.resolve(scriptPath) });
+}
+async function clearCrashRecoveryState(userDataDir) {
+  // Chrome stores exit_type in Preferences. If it's "Crashed", Chrome shows
+  // the "restore pages?" bubble on next launch. We set it to "Normal" to suppress that.
+  const prefsPath = import_path.default.join(userDataDir, "Default", "Preferences");
+  try {
+    const raw = await import_fs.default.promises.readFile(prefsPath, "utf-8");
+    const prefs = JSON.parse(raw);
+    if (prefs.profile) {
+      prefs.profile.exit_type = "Normal";
+      prefs.profile.exited_cleanly = true;
+      await import_fs.default.promises.writeFile(prefsPath, JSON.stringify(prefs), "utf-8");
+    }
+  } catch (e) {
+    // File doesn't exist yet (first launch) or is malformed - both are fine
+  }
 }
 class AutoDetectCdpContextFactory extends BaseContextFactory {
   constructor(config) {
