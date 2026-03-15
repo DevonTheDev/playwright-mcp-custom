@@ -38,6 +38,7 @@ var import_console = __toESM(require("./tools/console"));
 var import_cookies = __toESM(require("./tools/cookies"));
 var import_devtools = __toESM(require("./tools/devtools"));
 var import_dialogs = __toESM(require("./tools/dialogs"));
+var import_download = __toESM(require("./tools/download"));
 var import_evaluate = __toESM(require("./tools/evaluate"));
 var import_files = __toESM(require("./tools/files"));
 var import_form = __toESM(require("./tools/form"));
@@ -49,8 +50,10 @@ var import_network = __toESM(require("./tools/network"));
 var import_pdf = __toESM(require("./tools/pdf"));
 var import_route = __toESM(require("./tools/route"));
 var import_runCode = __toESM(require("./tools/runCode"));
+var import_saveContent = __toESM(require("./tools/saveContent"));
 var import_snapshot = __toESM(require("./tools/snapshot"));
 var import_screenshot = __toESM(require("./tools/screenshot"));
+var import_status = __toESM(require("./tools/status"));
 var import_storage = __toESM(require("./tools/storage"));
 var import_tabs = __toESM(require("./tools/tabs"));
 var import_tracing = __toESM(require("./tools/tracing"));
@@ -65,6 +68,7 @@ const browserTools = [
   ...import_cookies.default,
   ...import_devtools.default,
   ...import_dialogs.default,
+  ...import_download.default,
   ...import_evaluate.default,
   ...import_files.default,
   ...import_form.default,
@@ -76,8 +80,10 @@ const browserTools = [
   ...import_pdf.default,
   ...import_route.default,
   ...import_runCode.default,
+  ...import_saveContent.default,
   ...import_screenshot.default,
   ...import_snapshot.default,
+  ...import_status.default,
   ...import_storage.default,
   ...import_tabs.default,
   ...import_tracing.default,
