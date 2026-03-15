@@ -30,15 +30,19 @@ var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
 
 function runPowerShell(script, timeout = 10000) {
+  const tmpScript = path.join(os.tmpdir(), `mcp-ps-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.ps1`);
   try {
+    fs.writeFileSync(tmpScript, script, "utf-8");
     const result = execSync(
-      "powershell.exe -NoProfile -NonInteractive -Command -",
-      { input: script, encoding: "utf-8", timeout, windowsHide: true }
+      `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tmpScript}"`,
+      { encoding: "utf-8", timeout, windowsHide: true }
     );
     return { success: true, output: result.trim() };
   } catch (e) {
     const stderr = e.stderr ? e.stderr.toString().trim() : "";
     return { success: false, error: stderr || e.message || String(e) };
+  } finally {
+    try { fs.unlinkSync(tmpScript); } catch (e) {}
   }
 }
 

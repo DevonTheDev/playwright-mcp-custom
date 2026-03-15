@@ -32,15 +32,21 @@ var import_tool = require("./tool");
 // ── PowerShell helpers ──────────────────────────────────────────────
 
 function runPowerShell(script, timeout = 15000) {
+  // Write to temp .ps1 file to support multi-line control structures
+  // (PowerShell stdin mode can't handle if/else/for blocks)
+  const tmpScript = path.join(os.tmpdir(), `mcp-ps-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.ps1`);
   try {
+    fs.writeFileSync(tmpScript, script, "utf-8");
     const result = execSync(
-      "powershell.exe -NoProfile -NonInteractive -Command -",
-      { input: script, encoding: "utf-8", timeout, windowsHide: true }
+      `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tmpScript}"`,
+      { encoding: "utf-8", timeout, windowsHide: true }
     );
     return { success: true, output: result.trim() };
   } catch (e) {
     const stderr = e.stderr ? e.stderr.toString().trim() : "";
     return { success: false, error: stderr || e.message || String(e) };
+  } finally {
+    try { fs.unlinkSync(tmpScript); } catch (e) {}
   }
 }
 
@@ -122,6 +128,7 @@ const desktopScreenshot = (0, import_tool.defineTool)({
     description: "Screenshot the desktop or a specific window.",
     inputSchema: import_mcpBundle.z.object({
       windowTitle: import_mcpBundle.z.string().optional().describe("Window title to capture (partial match). Omit for full desktop."),
+      monitor: import_mcpBundle.z.number().optional().describe("Monitor number (1-based). Omit to capture all monitors."),
       filename: import_mcpBundle.z.string().optional().describe("Filename to save as")
     }),
     type: "readOnly"
@@ -154,12 +161,37 @@ $bitmap.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png)
 $graphics.Dispose(); $bitmap.Dispose()
 Write-Output '${safePath}'
 `;
-    } else {
-      // Full desktop capture using PrimaryScreen (most reliable)
+    } else if (params.monitor) {
+      // Capture a specific monitor by number (1-based)
+      const monIdx = params.monitor - 1;
       script = `
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
-$bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+$screens = [System.Windows.Forms.Screen]::AllScreens
+if (${monIdx} -ge $screens.Length) { Write-Error "Monitor ${params.monitor} not found. Available: $($screens.Length)"; exit 1 }
+$bounds = $screens[${monIdx}].Bounds
+$bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
+$graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+$graphics.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bounds.Size)
+$bitmap.Save('${safePath}', [System.Drawing.Imaging.ImageFormat]::Png)
+$graphics.Dispose(); $bitmap.Dispose()
+Write-Output '${safePath}'
+`;
+    } else {
+      // Full desktop capture spanning ALL monitors
+      script = `
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+$screens = [System.Windows.Forms.Screen]::AllScreens
+if ($screens.Length -eq 1) {
+  $bounds = $screens[0].Bounds
+} else {
+  [int]$minX = [int]($screens | ForEach-Object { $_.Bounds.X } | Measure-Object -Minimum).Minimum
+  [int]$minY = [int]($screens | ForEach-Object { $_.Bounds.Y } | Measure-Object -Minimum).Minimum
+  [int]$maxX = [int]($screens | ForEach-Object { $_.Bounds.X + $_.Bounds.Width } | Measure-Object -Maximum).Maximum
+  [int]$maxY = [int]($screens | ForEach-Object { $_.Bounds.Y + $_.Bounds.Height } | Measure-Object -Maximum).Maximum
+  $bounds = New-Object System.Drawing.Rectangle($minX, $minY, ($maxX - $minX), ($maxY - $minY))
+}
 $bitmap = New-Object System.Drawing.Bitmap($bounds.Width, $bounds.Height)
 $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 $graphics.CopyFromScreen($bounds.X, $bounds.Y, 0, 0, $bounds.Size)
@@ -479,6 +511,35 @@ Write-Output "$($point.X),$($point.Y)"
   }
 });
 
+// ── Desktop List Monitors ───────────────────────────────────────────
+
+const desktopListMonitors = (0, import_tool.defineTool)({
+  capability: "core",
+  schema: {
+    name: "desktop_list_monitors",
+    title: "List monitors",
+    description: "List all connected monitors with resolution and position.",
+    inputSchema: import_mcpBundle.z.object({}),
+    type: "readOnly"
+  },
+  handle: async (context, params, response) => {
+    const script = `
+Add-Type -AssemblyName System.Windows.Forms
+$screens = [System.Windows.Forms.Screen]::AllScreens
+for ($i = 0; $i -lt $screens.Length; $i++) {
+  $s = $screens[$i]
+  $p = ""
+  if ($s.Primary) { $p = " (primary)" }
+  $num = $i + 1
+  Write-Output ("$num" + $p + ": " + $s.Bounds.Width + "x" + $s.Bounds.Height + " at (" + $s.Bounds.X + "," + $s.Bounds.Y + ") " + $s.DeviceName)
+}
+`;
+    const result = runPowerShell(script);
+    if (!result.success) throw new Error(`List monitors failed: ${result.error}`);
+    response.addTextResult(`## Monitors\n${result.output}`);
+  }
+});
+
 var desktop_default = [
   desktopScreenshot,
   desktopClick,
@@ -489,5 +550,6 @@ var desktop_default = [
   desktopListWindows,
   desktopFocusWindow,
   desktopLaunch,
-  desktopCursorPos
+  desktopCursorPos,
+  desktopListMonitors
 ];
