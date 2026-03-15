@@ -25,6 +25,7 @@ module.exports = __toCommonJS(shell_exports);
 const { execSync } = require("child_process");
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
+var import_psSession = require("./powershellSession");
 
 // ── Shell Execute ───────────────────────────────────────────────────
 
@@ -120,29 +121,19 @@ const shellPowerShell = (0, import_tool.defineTool)({
   },
   handle: async (context, params, response) => {
     const timeout = Math.min(params.timeout || 30000, 120000);
-    try {
-      const stdout = execSync(
-        "powershell.exe -NoProfile -NonInteractive -Command -",
-        { input: params.script, encoding: "utf-8", timeout, windowsHide: true, maxBuffer: 10 * 1024 * 1024 }
-      );
-      const output = stdout.trim();
-      const lines = [];
-      if (output) {
-        lines.push(`\`\`\`\n${output.slice(0, 10000)}\n\`\`\``);
-        if (output.length > 10000) lines.push(`(truncated, ${output.length} total chars)`);
+    const result = await import_psSession.runPowerShell(params.script, timeout);
+    const lines = [];
+    if (result.success) {
+      if (result.output) {
+        lines.push(`\`\`\`\n${result.output.slice(0, 10000)}\n\`\`\``);
+        if (result.output.length > 10000) lines.push(`(truncated, ${result.output.length} total chars)`);
       } else {
         lines.push("(no output)");
       }
-      response.addTextResult(lines.join("\n"));
-    } catch (e) {
-      const stdout = e.stdout ? e.stdout.toString().trim() : "";
-      const stderr = e.stderr ? e.stderr.toString().trim() : "";
-      const lines = [];
-      if (stdout) lines.push(`Stdout:\n\`\`\`\n${stdout.slice(0, 5000)}\n\`\`\``);
-      if (stderr) lines.push(`Stderr:\n\`\`\`\n${stderr.slice(0, 5000)}\n\`\`\``);
-      lines.push(`Exit code: ${e.status ?? "unknown"}`);
-      response.addTextResult(lines.join("\n"));
+    } else {
+      lines.push(`Error: ${result.error?.slice(0, 5000) || "unknown"}`);
     }
+    response.addTextResult(lines.join("\n"));
   }
 });
 

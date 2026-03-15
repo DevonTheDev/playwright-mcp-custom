@@ -22,60 +22,15 @@ __export(desktop_exports, {
 });
 module.exports = __toCommonJS(desktop_exports);
 
-const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
+var import_psSession = require("./powershellSession");
 
-// ── PowerShell helpers ──────────────────────────────────────────────
-
-function runPowerShell(script, timeout = 15000) {
-  // Write to temp .ps1 file to support multi-line control structures
-  // (PowerShell stdin mode can't handle if/else/for blocks)
-  const tmpScript = path.join(os.tmpdir(), `mcp-ps-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.ps1`);
-  try {
-    fs.writeFileSync(tmpScript, script, "utf-8");
-    const result = execSync(
-      `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tmpScript}"`,
-      { encoding: "utf-8", timeout, windowsHide: true }
-    );
-    return { success: true, output: result.trim() };
-  } catch (e) {
-    const stderr = e.stderr ? e.stderr.toString().trim() : "";
-    return { success: false, error: stderr || e.message || String(e) };
-  } finally {
-    try { fs.unlinkSync(tmpScript); } catch (e) {}
-  }
-}
-
-const WIN32_TYPES = `
-Add-Type -ErrorAction SilentlyContinue @"
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-public class Win32Input {
-    [DllImport("user32.dll")] public static extern bool SetCursorPos(int X, int Y);
-    [DllImport("user32.dll")] public static extern void mouse_event(uint dwFlags, int dx, int dy, uint dwData, IntPtr dwExtraInfo);
-    [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr hWnd);
-    [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-    [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
-    [DllImport("user32.dll", CharSet=CharSet.Auto)]
-    public static extern int GetWindowText(IntPtr hWnd, StringBuilder text, int count);
-    [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT lpPoint);
-    [DllImport("user32.dll")] public static extern bool MoveWindow(IntPtr hWnd, int X, int Y, int nWidth, int nHeight, bool bRepaint);
-    [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-    [StructLayout(LayoutKind.Sequential)] public struct POINT { public int X; public int Y; }
-    [StructLayout(LayoutKind.Sequential)] public struct RECT { public int Left; public int Top; public int Right; public int Bottom; }
-    public const uint LEFTDOWN = 0x0002, LEFTUP = 0x0004;
-    public const uint RIGHTDOWN = 0x0008, RIGHTUP = 0x0010;
-    public const uint MIDDLEDOWN = 0x0020, MIDDLEUP = 0x0040;
-    public const uint WHEEL = 0x0800;
-    public const int SW_RESTORE = 9, SW_SHOW = 5, SW_MINIMIZE = 6, SW_MAXIMIZE = 3;
-}
-"@
-`;
+// Use persistent PS session - Win32 types, Forms, Drawing are preloaded
+const runPowerShell = import_psSession.runPowerShell;
 
 // ── Key combo mapping ───────────────────────────────────────────────
 
@@ -142,9 +97,8 @@ const desktopScreenshot = (0, import_tool.defineTool)({
       // Capture specific window
       const escapedTitle = params.windowTitle.replace(/'/g, "''");
       script = `
-${WIN32_TYPES}
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+
+
 $proc = Get-Process | Where-Object { $_.MainWindowTitle -like '*${escapedTitle}*' -and $_.MainWindowHandle -ne [IntPtr]::Zero } | Select-Object -First 1
 if (-not $proc) { Write-Error "No window found matching '${escapedTitle}'"; exit 1 }
 $hwnd = $proc.MainWindowHandle
@@ -165,8 +119,7 @@ Write-Output '${safePath}'
       // Capture a specific monitor by number (1-based)
       const monIdx = params.monitor - 1;
       script = `
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+
 $screens = [System.Windows.Forms.Screen]::AllScreens
 if (${monIdx} -ge $screens.Length) { Write-Error "Monitor ${params.monitor} not found. Available: $($screens.Length)"; exit 1 }
 $bounds = $screens[${monIdx}].Bounds
@@ -180,8 +133,7 @@ Write-Output '${safePath}'
     } else {
       // Full desktop capture spanning ALL monitors
       script = `
-Add-Type -AssemblyName System.Windows.Forms
-Add-Type -AssemblyName System.Drawing
+
 $screens = [System.Windows.Forms.Screen]::AllScreens
 if ($screens.Length -eq 1) {
   $bounds = $screens[0].Bounds
@@ -246,7 +198,7 @@ const desktopClick = (0, import_tool.defineTool)({
     }
 
     const script = `
-${WIN32_TYPES}
+
 [Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null
 Start-Sleep -Milliseconds 50
 ${clickCode}
@@ -274,7 +226,7 @@ const desktopType = (0, import_tool.defineTool)({
   handle: async (context, params, response) => {
     const escaped = escapeSendKeys(params.text);
     const script = `
-Add-Type -AssemblyName System.Windows.Forms
+
 [System.Windows.Forms.SendKeys]::SendWait('${escaped.replace(/'/g, "''")}')
 Write-Output "Typed text"
 `;
@@ -300,7 +252,7 @@ const desktopKey = (0, import_tool.defineTool)({
   handle: async (context, params, response) => {
     const sendKeysStr = keyComboToSendKeys(params.key);
     const script = `
-Add-Type -AssemblyName System.Windows.Forms
+
 [System.Windows.Forms.SendKeys]::SendWait('${sendKeysStr.replace(/'/g, "''")}')
 Write-Output "Pressed ${params.key}"
 `;
@@ -326,7 +278,7 @@ const desktopMouseMove = (0, import_tool.defineTool)({
   },
   handle: async (context, params, response) => {
     const script = `
-${WIN32_TYPES}
+
 [Win32Input]::SetCursorPos(${params.x}, ${params.y}) | Out-Null
 Write-Output "Moved to (${params.x}, ${params.y})"
 `;
@@ -358,7 +310,7 @@ const desktopScroll = (0, import_tool.defineTool)({
     // For negative scroll values, we need to convert to uint32 via bitwise
     const amountExpr = amount < 0 ? `([uint32](0x100000000 + ${amount}))` : `${amount}`;
     const script = `
-${WIN32_TYPES}
+
 ${moveCmd}
 [Win32Input]::mouse_event([Win32Input]::WHEEL, 0, 0, ${amountExpr}, [IntPtr]::Zero)
 Write-Output "Scrolled ${params.direction} ${params.clicks} clicks"
@@ -442,7 +394,7 @@ if (-not $proc) { Write-Error "No window found matching '${escapedTitle}'"; exit
     }
 
     const script = `
-${WIN32_TYPES}
+
 ${findCmd}
 $hwnd = $proc.MainWindowHandle
 [Win32Input]::ShowWindow($hwnd, ${swCmd}) | Out-Null
@@ -499,7 +451,7 @@ const desktopCursorPos = (0, import_tool.defineTool)({
   },
   handle: async (context, params, response) => {
     const script = `
-${WIN32_TYPES}
+
 $point = New-Object Win32Input+POINT
 [Win32Input]::GetCursorPos([ref]$point) | Out-Null
 Write-Output "$($point.X),$($point.Y)"
@@ -524,7 +476,7 @@ const desktopListMonitors = (0, import_tool.defineTool)({
   },
   handle: async (context, params, response) => {
     const script = `
-Add-Type -AssemblyName System.Windows.Forms
+
 $screens = [System.Windows.Forms.Screen]::AllScreens
 for ($i = 0; $i -lt $screens.Length; $i++) {
   $s = $screens[$i]

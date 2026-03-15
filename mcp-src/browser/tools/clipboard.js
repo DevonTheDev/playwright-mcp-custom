@@ -22,29 +22,14 @@ __export(clipboard_exports, {
 });
 module.exports = __toCommonJS(clipboard_exports);
 
-const { execSync } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 const os = require("os");
 var import_mcpBundle = require("playwright-core/lib/mcpBundle");
 var import_tool = require("./tool");
+var import_psSession = require("./powershellSession");
 
-function runPowerShell(script, timeout = 10000) {
-  const tmpScript = path.join(os.tmpdir(), `mcp-ps-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.ps1`);
-  try {
-    fs.writeFileSync(tmpScript, script, "utf-8");
-    const result = execSync(
-      `powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${tmpScript}"`,
-      { encoding: "utf-8", timeout, windowsHide: true }
-    );
-    return { success: true, output: result.trim() };
-  } catch (e) {
-    const stderr = e.stderr ? e.stderr.toString().trim() : "";
-    return { success: false, error: stderr || e.message || String(e) };
-  } finally {
-    try { fs.unlinkSync(tmpScript); } catch (e) {}
-  }
-}
+const runPowerShell = import_psSession.runPowerShell;
 
 // ── Clipboard Read Text ─────────────────────────────────────────────
 
@@ -112,7 +97,7 @@ const clipboardReadImage = (0, import_tool.defineTool)({
   handle: async (context, params, response) => {
     const tempFile = path.join(os.tmpdir(), `clipboard-img-${Date.now()}.png`);
     const script = `
-Add-Type -AssemblyName System.Windows.Forms
+
 $img = [System.Windows.Forms.Clipboard]::GetImage()
 if ($img -eq $null) {
     Write-Output "NO_IMAGE"
