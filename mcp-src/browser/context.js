@@ -39,6 +39,7 @@ var import_url = require("url");
 var import_log = require("../log");
 var import_tab = require("./tab");
 var import_config = require("./config");
+var crashlog = require("../crashlog");
 const testDebug = (0, import_utilsBundle.debug)("pw:mcp:test");
 class Context {
   constructor(options) {
@@ -136,6 +137,7 @@ class Context {
     return video.allVideos;
   }
   _onPageCreated(page) {
+    crashlog.info("CONTEXT", "page created", { url: page.url() });
     if (this._closeGraceTimer) {
       clearTimeout(this._closeGraceTimer);
       this._closeGraceTimer = null;
@@ -150,6 +152,7 @@ class Context {
       this._currentTab = tab;
   }
   _onPageClosed(tab) {
+    crashlog.info("CONTEXT", "page closed", { tabId: tab._tabId, url: tab.page?.url?.() });
     const index = this._tabs.indexOf(tab);
     if (index === -1)
       return;
@@ -170,6 +173,7 @@ class Context {
     }
   }
   async closeBrowserContext() {
+    crashlog.info("CONTEXT", "closeBrowserContext called");
     if (!this._closeBrowserContextPromise)
       this._closeBrowserContextPromise = this._closeBrowserContextImpl().catch(import_log.logUnhandledError);
     await this._closeBrowserContextPromise;
@@ -254,12 +258,14 @@ class Context {
     return this._browserContextPromise;
   }
   async _setupBrowserContext() {
+    crashlog.info("CONTEXT", "_setupBrowserContext start");
     if (this._closeBrowserContextPromise)
       throw new Error("Another browser context is being closed.");
     if (this.config.testIdAttribute)
       import_playwright_core.selectors.setTestIdAttribute(this.config.testIdAttribute);
     const result = await this._browserContextFactory.createContext(this._clientInfo, this._abortController.signal, { toolName: this._runningToolName });
     const { browserContext } = result;
+    crashlog.info("CONTEXT", "browser context created");
     if (!this.config.allowUnrestrictedFileAccess) {
       browserContext._setAllowedProtocols(["http:", "https:", "about:", "data:"]);
       browserContext._setAllowedDirectories(allRootPaths(this._clientInfo));
@@ -268,6 +274,18 @@ class Context {
     for (const page of browserContext.pages())
       this._onPageCreated(page);
     browserContext.on("page", (page) => this._onPageCreated(page));
+    browserContext.on("close", () => {
+      crashlog.warn("CONTEXT", "browserContext 'close' event fired");
+    });
+    // Log browser disconnect if we can access the browser object
+    try {
+      const browser = browserContext.browser?.();
+      if (browser) {
+        browser.on("disconnected", () => {
+          crashlog.error("BROWSER", "browser 'disconnected' event fired - browser process likely crashed");
+        });
+      }
+    } catch (e) {}
     if (this.config.saveTrace) {
       await browserContext.tracing.start({
         name: "trace-" + Date.now(),
@@ -276,6 +294,7 @@ class Context {
         _live: true
       });
     }
+    crashlog.info("CONTEXT", "_setupBrowserContext complete");
     return result;
   }
   lookupSecret(secretName) {

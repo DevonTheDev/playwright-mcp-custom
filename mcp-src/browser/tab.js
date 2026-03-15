@@ -31,6 +31,7 @@ var import_logFile = require("./logFile");
 var import_dialogs = require("./tools/dialogs");
 var import_files = require("./tools/files");
 var import_transform = require("playwright/lib/transform/transform");
+var crashlog = require("../crashlog");
 const TabEvents = {
   modalState: "modalState"
 };
@@ -51,7 +52,13 @@ class Tab extends import_events.EventEmitter {
     page.on("request", (request) => this._handleRequest(request));
     page.on("response", (response) => this._handleResponse(response));
     page.on("requestfailed", (request) => this._handleRequestFailed(request));
-    page.on("close", () => this._onClose());
+    page.on("close", () => {
+      crashlog.info("TAB", "page 'close' event", { url: page.url() });
+      this._onClose();
+    });
+    page.on("crash", () => {
+      crashlog.error("TAB", "page 'crash' event - renderer process crashed", { url: page.url() });
+    });
     page.on("filechooser", (chooser) => {
       this.setModalState({
         type: "fileChooser",

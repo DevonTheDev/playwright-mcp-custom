@@ -15,6 +15,10 @@
  * limitations under the License.
  */
 
+const crashlog = require('./mcp-src/crashlog');
+crashlog.clearLog();
+crashlog.installGlobalHandlers();
+
 const { program } = require('playwright-core/lib/utilsBundle');
 const { decorateMCPCommand } = require('./mcp-src/program');
 
